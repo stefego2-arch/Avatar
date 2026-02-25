@@ -543,13 +543,25 @@ class LessonEngine:
                 time_sec=qr.time_sec,
             )
 
-            # skill tracking dacă există
+        # Skill mastery — rulează indiferent de exercise_id (funcționează și pt JSON packs)
+        if self.session.session_id:
             skill_codes = ex.get("skill_codes")
-            if skill_codes:
-                self.db.update_user_skills(
-                    self.session.user_id, skill_codes, qr.is_correct,
-                    time_sec=qr.time_sec, hints_used=qr.hints_used,
-                )
+            if not skill_codes:
+                # Fallback: derivăm un skill code din subiect + clasă (ex: "MATH_4", "RO_3")
+                subj = (self.session.lesson.get("subject") or "").upper()
+                grade = self.session.lesson.get("grade") or 0
+                prefix = "MATH" if "MAT" in subj else ("RO" if "ROM" in subj or "COMUNICARE" in subj else "GEN")
+                skill_codes = [f"{prefix}_{grade}"]
+
+            # Tier-aware weight: tier 1 → delta mic, tier 3-4 → delta mare
+            tier_weights = {1: 0.33, 2: 0.67, 3: 1.0, 4: 1.33}
+            weight = tier_weights.get(self.session.current_tier, 1.0)
+
+            self.db.update_user_skills(
+                self.session.user_id, skill_codes, qr.is_correct,
+                time_sec=qr.time_sec, hints_used=qr.hints_used,
+                weight=weight,
+            )
 
         # Error bank: exercițiul greșit se reprogramează pentru sesiunile viitoare
         if not is_correct and qr.exercise_id > 0:
