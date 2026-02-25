@@ -122,6 +122,27 @@ _MD_RE_TABLE_SEP = re.compile(r"^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*
 _MD_RE_EMPH = re.compile(r"(\*\*|__|\*|_)")
 _MD_RE_HTML = re.compile(r"<[^>]+>")
 
+# ── markdown-it-py AST parser (optional, graceful fallback) ──────────────────
+try:
+    from markdown_it import MarkdownIt as _MDIt
+    _md_parser = _MDIt()
+
+    def _md_to_plain_ast(text: str) -> str:
+        """Convertește markdown → text plain folosind AST (markdown-it-py).
+        Returnează None dacă markdown-it-py nu e instalat (fallback la regex).
+        """
+        lines: list[str] = []
+        for tok in _md_parser.parse(text):
+            if tok.type == "inline" and tok.children:
+                lines.append("".join(
+                    c.content for c in tok.children
+                    if c.type in ("text", "softbreak", "hardbreak", "code_inline")
+                ))
+        return "\n".join(lines)
+
+except ImportError:
+    _md_to_plain_ast = None   # type: ignore[assignment]
+
 
 def sanitize_markdown_for_tts(text: str, *, keep_headings: bool = True) -> str:
     t = text

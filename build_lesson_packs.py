@@ -6,7 +6,8 @@ Versiunea cu fix-uri aplicate:
   FIX 3 — artefacte DA/NU + linii majuscule scurte filtrate suplimentar
 
 Rulare:
-    python build_lesson_packs.py
+    python build_lesson_packs.py           # exerciții rule-based (implicit)
+    python build_lesson_packs.py --llm     # exerciții generate de DeepSeek
 
 Output:
     lesson_packs/*.json
@@ -14,6 +15,7 @@ Output:
 """
 from __future__ import annotations
 
+import argparse
 import json
 import re
 import zipfile
@@ -133,11 +135,25 @@ def build_quiz_rule_based(clean_text: str, n: int = 3) -> List[Dict]:
     return out
 
 
+def _normalize_llm_exercise(ex: dict) -> dict:
+    """Convertește formatul DeepSeek {enunt/raspuns/hint*} → formatul intern {q/a/type}."""
+    return {
+        "q":     ex.get("enunt", ""),
+        "type":  "open",
+        "a":     ex.get("raspuns", ""),
+        "hint1": ex.get("hint1", ""),
+        "hint2": ex.get("hint2", ""),
+        "hint3": ex.get("hint3", ""),
+    }
+
+
 def build_lesson_pack(
     md_file: Path,
     sec: Section,
     subject: str,
     grade: Optional[int],
+    *,
+    llm_client=None,
 ) -> Dict:
     """Construiește un lesson pack JSON pentru o secțiune a unui manual."""
     # Curăță textul secțiunii pentru TTS (folosim load_md_clean_text pe fișierul complet,
@@ -155,7 +171,20 @@ def build_lesson_pack(
     if not chunks:
         chunks = [sec_clean[:900]] if sec_clean else []
 
-    quiz = build_quiz_rule_based(sec_clean, n=3)
+    # ── Generare exerciții: LLM sau rule-based ────────────────────────────────
+    if llm_client is not None and grade is not None:
+        exercises = [
+            _normalize_llm_exercise(e)
+            for e in llm_client.generate_exercises(
+                sec.title, grade=grade, subject=subject,
+                theory=sec_clean[:600], count=5, phase="practice",
+            )
+        ]
+        if not exercises:
+            # Fallback la rule-based dacă LLM-ul nu răspunde
+            exercises = build_quiz_rule_based(sec_clean, n=5)
+    else:
+        exercises = build_quiz_rule_based(sec_clean, n=5)
 
     return {
         "meta": {
@@ -165,12 +194,13 @@ def build_lesson_pack(
             "grade": grade,  # FIX 1: acum vine din manual_index.json, nu mai e null
         },
         "theory_chunks": chunks,
-        "pretest": quiz[:1],
-        "micro_quiz": quiz[1:2],
-        "practice": quiz[2:3],
-        "posttest": quiz[:3],
+        "pretest":   exercises[:1],
+        "micro_quiz": exercises[1:2],
+        "practice":   exercises[2:3],
+        "posttest":   exercises[:3],
         "notes": {
             "task_heavy": is_task_heavy(sec.text),
+            "llm_exercises": llm_client is not None and grade is not None,
         },
     }
 
@@ -178,6 +208,26 @@ def build_lesson_pack(
 # ── Main ───────────────────────────────────────────────────────────────────────
 
 def main():
+    parser = argparse.ArgumentParser(
+        description="Generează lesson_packs/*.json din manualele .md"
+    )
+    parser.add_argument(
+        "--llm", action="store_true",
+        help="Generează exerciții cu DeepSeek în loc de rule-based (necesită Ollama activ)"
+    )
+    args = parser.parse_args()
+
+    # ── Inițializare opțională DeepSeek ──────────────────────────────────────
+    llm_client = None
+    if args.llm:
+        from deepseek_client import DeepSeekClient
+        llm_client = DeepSeekClient()
+        if not llm_client.available:
+            print("⚠️  DeepSeek indisponibil — fallback la rule-based pentru toate lecțiile.")
+            llm_client = None
+        else:
+            print("🤖 Mod LLM activat — exerciții generate de DeepSeek")
+
     # Detectează directorul de manuale (manuale_main/ are prioritate, fallback manuale/)
     root = Path(__file__).parent
     for candidate in ("manuale_main", "manuale"):
@@ -240,7 +290,8 @@ def main():
             sections = split_into_sections(raw)[:1]
 
         for idx, sec in enumerate(sections, 1):
-            pack = build_lesson_pack(md, sec, subject=subject, grade=grade)
+            pack = build_lesson_pack(md, sec, subject=subject, grade=grade,
+                                     llm_client=llm_client)
             safe_title = re.sub(
                 r"[^a-zA-Z0-9ăâîșțĂÂÎȘȚ _\-]+", "", sec.title
             ).strip().replace(" ", "_")
@@ -252,11 +303,14 @@ def main():
             packs.append((out_name, pack))
 
     # ── Raport ───────────────────────────────────────────────────────────────
-    grade_null = sum(1 for _, p in packs if p["meta"]["grade"] is None)
+    grade_null  = sum(1 for _, p in packs if p["meta"]["grade"] is None)
+    llm_used    = sum(1 for _, p in packs if p["notes"].get("llm_exercises"))
     print(f"\n✅ Generat: {len(packs)} lesson packs")
     print(f"   Grade rezolvate din index: {grade_resolved}/{len(md_files)} fișiere")
     print(f"   Grade null în output:      {grade_null}/{len(packs)} pack-uri")
     print(f"   Secțiuni junk eliminate:   {skipped_junk}")
+    if args.llm:
+        print(f"   Exerciții LLM:             {llm_used}/{len(packs)} pack-uri")
 
     # ── ZIP ───────────────────────────────────────────────────────────────────
     zip_path = root / "lesson_packs.zip"

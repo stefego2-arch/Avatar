@@ -24,7 +24,7 @@ from PyQt6.QtWidgets import (
     QComboBox, QScrollArea, QFrame, QGroupBox, QSizePolicy,
     QProgressBar, QDialog, QFileDialog, QMessageBox
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import Qt, QObject, QThread, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont, QColor, QPainter, QPen, QBrush, QPixmap
 
 # Matplotlib embedded in Qt6
@@ -108,6 +108,25 @@ class ChartCanvas(FigureCanvas):
         self.fig = Figure(figsize=figsize, dpi=dpi, facecolor=C_BG)
         super().__init__(self.fig)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+
+
+# ── Worker QThread pentru fetch date DB ──────────────────────────────────────
+
+class _DashWorker(QObject):
+    """Execută query-urile SQL de dashboard pe un QThread separat."""
+    done  = pyqtSignal(dict)
+    error = pyqtSignal(str)
+
+    def __init__(self, db, user_id: int):
+        super().__init__()
+        self._db  = db
+        self._uid = user_id
+
+    def run(self):
+        try:
+            self.done.emit(self._db.get_dashboard_data(self._uid))
+        except Exception as exc:
+            self.error.emit(str(exc))
 
 
 # ── Dashboard principal ───────────────────────────────────────────────────────
@@ -272,38 +291,41 @@ class DashboardScreen(QWidget):
         self._refresh()
 
     def _refresh(self):
+        """Lansează fetch-ul SQL pe un QThread separat pentru a nu bloca UI-ul."""
         if self._user_id is None:
             return
+        # Evită lansări multiple simultane
+        if hasattr(self, "_dash_thread") and self._dash_thread.isRunning():
+            return
+
+        self._dash_thread = QThread()
+        self._dash_worker = _DashWorker(self._db, self._user_id)
+        self._dash_worker.moveToThread(self._dash_thread)
+        self._dash_thread.started.connect(self._dash_worker.run)
+        self._dash_worker.done.connect(self._on_data_ready)
+        self._dash_worker.done.connect(self._dash_thread.quit)
+        self._dash_worker.error.connect(
+            lambda e: print(f"⚠️  Dashboard DB error: {e}")
+        )
+        self._dash_thread.start()
+
+    def _on_data_ready(self, data: dict):
+        """Apelat pe main thread după ce QThread-ul a terminat fetch-ul SQL."""
         uid = self._user_id
-        conn = self._db.conn
 
-        # ── Sesiuni ──────────────────────────────────────────────────────────
-        cur = conn.execute(
-            "SELECT score, duration_s, started_at, lesson_id, subject "
-            "FROM sessions s "
-            "JOIN lessons l ON l.id = s.lesson_id "
-            "WHERE s.user_id = ? ORDER BY s.started_at",
-            (uid,)
-        )
-        sessions = cur.fetchall()
-
-        # ── Progress (lectii trecute) ─────────────────────────────────────────
-        cur2 = conn.execute(
-            "SELECT p.lesson_id, p.best_score, p.passed, l.subject "
-            "FROM progress p JOIN lessons l ON l.id = p.lesson_id "
-            "WHERE p.user_id = ?",
-            (uid,)
-        )
-        progress = cur2.fetchall()
-
-        # ── User_skill ────────────────────────────────────────────────────────
-        cur3 = conn.execute(
-            "SELECT us.skill_code, us.mastery, s.name "
-            "FROM user_skill us LEFT JOIN skills s ON s.code = us.skill_code "
-            "WHERE us.user_id = ? ORDER BY us.mastery DESC",
-            (uid,)
-        )
-        skills = cur3.fetchall()
+        # Convertim dict-urile în tuple-uri (compatibil cu metodele de desenare existente)
+        sessions = [
+            (r["score"], r["duration_s"], r["started_at"], r["lesson_id"], r["subject"])
+            for r in data["sessions"]
+        ]
+        progress = [
+            (r["lesson_id"], r["best_score"], r["passed"], r["subject"])
+            for r in data["progress"]
+        ]
+        skills = [
+            (r["skill_code"], r["mastery"], r["name"])
+            for r in data["skills"]
+        ]
 
         # ── Calcul statistici generale ────────────────────────────────────────
         n_lectii  = sum(1 for p in progress if p[2])  # passed
@@ -317,12 +339,21 @@ class DashboardScreen(QWidget):
         self._card_streak.update_value(str(streak))
         self._card_timp.update_value(f"{total_min} min")
 
-        # ── Competency profile (date extinse pentru radar) ────────────────────
-        competency_profile = self._calc_competency_profile(uid)
+        # ── Competency profile (din skills extinse din DB) ────────────────────
+        skills_ext = [
+            {
+                "skill_code":   r["skill_code"],
+                "mastery":      r["mastery"],
+                "avg_time":     r.get("avg_time") or 30.0,
+                "skill_streak": r.get("skill_streak") or 0,
+            }
+            for r in data["skills"]
+        ]
+        competency_profile = self._calc_competency_profile_from(skills_ext)
 
         # ── Grafice (fiecare izolat: o eroare de grafic nu blochează celelalte) ─
         for draw_fn, arg in [
-            (self._draw_score_timeline,    sessions),
+            (self._draw_score_timeline,     sessions),
             (self._draw_lessons_by_subject, progress),
             (self._draw_skill_bars,         skills),
             (self._draw_hard_lessons,       progress),
@@ -599,17 +630,8 @@ class DashboardScreen(QWidget):
 
     # ── Radar: Profil de Competențe ───────────────────────────────────────────
 
-    def _calc_competency_profile(self, user_id: int) -> dict:
-        """Calculează 5 scoruri [0..1] pentru radar chart din user_skill."""
-        import numpy as _np
-        conn = self._db.conn
-        rows = conn.execute(
-            "SELECT us.skill_code, us.mastery, us.avg_time, us.skill_streak "
-            "FROM user_skill us "
-            "WHERE us.user_id = ?",
-            (user_id,)
-        ).fetchall()
-
+    def _calc_competency_profile_from(self, skills_ext: list) -> dict:
+        """Calculează 5 scoruri [0..1] pentru radar chart din date pre-fetch-uite."""
         buckets: dict[str, list] = {
             "Matematică":   [],
             "Română":       [],
@@ -617,11 +639,11 @@ class DashboardScreen(QWidget):
             "Viteză":       [],
             "Consistență":  [],
         }
-        for r in rows:
-            code   = (r[0] or "").upper()
-            mastery = float(r[1] or 0.0)
-            avg_t   = float(r[2] or 30.0)
-            streak  = int(r[3] or 0)
+        for r in skills_ext:
+            code    = (r.get("skill_code") or "").upper()
+            mastery = float(r.get("mastery") or 0.0)
+            avg_t   = float(r.get("avg_time") or 30.0)
+            streak  = int(r.get("skill_streak") or 0)
 
             if code.startswith("MATH"):
                 buckets["Matematică"].append(mastery)
@@ -630,7 +652,7 @@ class DashboardScreen(QWidget):
             elif code.startswith("EN") or "LOGIC" in code:
                 buckets["Logică/EN"].append(mastery)
 
-            # Viteză: <15s → 1.0, >60s → 0.0 (liner clamp)
+            # Viteză: <15s → 1.0, >60s → 0.0 (linear clamp)
             speed = max(0.0, min(1.0, 1.0 - (avg_t - 15.0) / 45.0))
             buckets["Viteză"].append(speed)
 

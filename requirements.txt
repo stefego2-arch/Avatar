@@ -29,3 +29,4 @@ aiohttp>=3.9.0
 # ── Utilități ─────────────────────────────────────────
 python-dotenv>=1.0.0
 openpyxl>=3.1.0
+markdown-it-py>=3.0

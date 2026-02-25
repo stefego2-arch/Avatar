@@ -13,9 +13,13 @@ Necesită: pip install requests
 """
 
 import json
+import re
 import time
 import threading
 from typing import Optional, Callable, Generator
+
+# Elimină blocurile <think>...</think> pe care deepseek-r1 le adaugă uneori
+_THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
 
 
 # ─── Client principal ────────────────────────────────────────────────────────
@@ -66,6 +70,13 @@ class DeepSeekClient:
         self._cache: dict[str, str] = {}
         self.USE_CACHE = True
 
+    # ── Helpers ───────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _strip_think(text: str) -> str:
+        """Elimină blocurile <think>...</think> din răspunsurile deepseek-r1."""
+        return _THINK_RE.sub("", text).strip()
+
     # ── Disponibilitate ───────────────────────────────────────────────────────
 
     @property
@@ -110,7 +121,8 @@ class DeepSeekClient:
     # ── API principal ─────────────────────────────────────────────────────────
 
     def ask(self, prompt: str, system: str = None,
-            cache_key: str = None, timeout: int = None) -> Optional[str]:
+            cache_key: str = None, timeout: int = None,
+            _force_json: bool = False) -> Optional[str]:
         """
         Trimite o întrebare și returnează răspunsul complet.
 
@@ -144,6 +156,8 @@ class DeepSeekClient:
             }
             if system:
                 payload["system"] = system
+            if _force_json:
+                payload["format"] = "json"   # Ollama returnează JSON valid garantat
 
             t_start = time.time()
             r = requests.post(
@@ -158,7 +172,7 @@ class DeepSeekClient:
                 return None
 
             data = r.json()
-            response = data.get("response", "").strip()
+            response = self._strip_think(data.get("response", ""))
 
             # Statistici
             self._call_count += 1
@@ -188,7 +202,8 @@ class DeepSeekClient:
             return None
 
     def ask_collect(self, prompt: str, system: str = None,
-                    cache_key: str = None) -> Optional[str]:
+                    cache_key: str = None,
+                    _force_json: bool = False) -> Optional[str]:
         """
         Varianta streaming a lui ask(): colectează răspunsul token cu token.
         Avantaj față de ask(): NU există read timeout (timeout=(15, None)).
@@ -217,6 +232,8 @@ class DeepSeekClient:
             }
             if system:
                 payload["system"] = system
+            if _force_json:
+                payload["format"] = "json"
 
             t_start = time.time()
             chunks: list[str] = []
@@ -241,7 +258,7 @@ class DeepSeekClient:
                             pass
 
             t_end = time.time()
-            response = "".join(chunks).strip()
+            response = self._strip_think("".join(chunks))
 
             self._call_count += 1
             self._consecutive_timeouts = 0
@@ -346,10 +363,15 @@ class DeepSeekClient:
             feedback = "Corect! 🎉" if is_correct else f"Nu e corect. Răspunsul corect: {raspuns_corect}"
             return is_correct, feedback
 
-        system = f"""Ești un profesor blând pentru copii de clasa {grade}.
-Verifică dacă răspunsul elevului este corect sau echivalent cu răspunsul așteptat.
-Răspunde DOAR cu: CORECT sau GRESIT, urmat de o linie nouă și feedback scurt (max 2 propoziții) în română.
-Fii încurajator și pozitiv."""
+        system = (
+            f"Ești profesor blând pentru copii de clasa {grade} din România.\n"
+            "Verifică dacă răspunsul elevului este corect sau echivalent cu cel așteptat.\n"
+            "Răspunde EXACT în formatul:\n"
+            "  CORECT | <feedback scurt, max 1-2 propoziții, încurajator>\n"
+            "sau:\n"
+            "  GRESIT | <ce era greșit și care este răspunsul corect>\n"
+            "NU adăuga alt text în afara acestui format."
+        )
 
         prompt = f"""Exercițiu: {enunt}
 Răspuns corect: {raspuns_corect}
@@ -364,10 +386,20 @@ Este răspunsul elevului corect?"""
             feedback = "Corect! 🎉" if is_correct else f"Răspunsul corect este: {raspuns_corect}"
             return is_correct, feedback
 
-        lines = response.strip().split("\n", 1)
-        first_line = lines[0].upper().strip()
-        is_correct = "CORECT" in first_line and "GRESIT" not in first_line
-        feedback = lines[1].strip() if len(lines) > 1 else response
+        # Parsing format: "CORECT | feedback" sau "GRESIT | feedback"
+        # Fallback la vechiul format (separare pe linie) dacă modelul nu respectă |
+        if "|" in response:
+            parts = response.split("|", 1)
+            verdict  = parts[0].strip().upper()
+            feedback = parts[1].strip() if len(parts) > 1 else ""
+        else:
+            lines    = response.strip().split("\n", 1)
+            verdict  = lines[0].upper().strip()
+            feedback = lines[1].strip() if len(lines) > 1 else response
+
+        is_correct = "CORECT" in verdict and "GRESIT" not in verdict
+        if not feedback:
+            feedback = "Corect! 🌟" if is_correct else f"Răspunsul corect este: {raspuns_corect}"
 
         return is_correct, feedback
 
@@ -475,10 +507,11 @@ IMPORTANT: Răspunde NUMAI cu JSON-ul, fără ```json sau altceva."""
         content_hash = hashlib.md5(content_for_prompt.encode()).hexdigest()[:8]
         ck = f"ex_{lesson_title}_{phase}_{count}_{content_hash}"
         if streaming:
-            response = self.ask_collect(prompt, system=system, cache_key=ck)
+            response = self.ask_collect(prompt, system=system, cache_key=ck, _force_json=True)
         else:
             response = self.ask(prompt, system=system,
-                               cache_key=ck, timeout=self.TIMEOUT_LONG)
+                               cache_key=ck, timeout=self.TIMEOUT_LONG,
+                               _force_json=True)
 
         if not response:
             return []

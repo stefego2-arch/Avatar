@@ -1916,6 +1916,36 @@ class Database:
             "streak_last_date": row["streak_last_date"] or "",
         }
 
+    def get_dashboard_data(self, user_id: int) -> dict:
+        """
+        Returnează toate datele necesare pentru Dashboard într-un singur apel.
+        Apelat din _DashWorker (QThread) pentru a nu bloca thread-ul principal Qt.
+        """
+        uid = int(user_id)
+        sessions = self._conn.execute(
+            "SELECT s.score, s.duration_s, s.started_at, s.lesson_id, l.subject "
+            "FROM sessions s JOIN lessons l ON l.id = s.lesson_id "
+            "WHERE s.user_id = ? ORDER BY s.started_at",
+            (uid,)
+        ).fetchall()
+        progress = self._conn.execute(
+            "SELECT p.lesson_id, p.best_score, p.passed, l.subject "
+            "FROM progress p JOIN lessons l ON l.id = p.lesson_id "
+            "WHERE p.user_id = ?",
+            (uid,)
+        ).fetchall()
+        skills = self._conn.execute(
+            "SELECT us.skill_code, us.mastery, us.avg_time, us.skill_streak, s.name "
+            "FROM user_skill us LEFT JOIN skills s ON s.code = us.skill_code "
+            "WHERE us.user_id = ? ORDER BY us.mastery DESC",
+            (uid,)
+        ).fetchall()
+        return {
+            "sessions": [dict(r) for r in sessions],
+            "progress": [dict(r) for r in progress],
+            "skills":   [dict(r) for r in skills],
+        }
+
     def close(self):
         try:
             self._conn.commit()
