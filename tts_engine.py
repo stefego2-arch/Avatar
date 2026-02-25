@@ -105,6 +105,9 @@ class TTSEngine(QObject):
         # sounddevice stop event
         self._sd_stop_event = threading.Event()
 
+        # Lip-sync: volum RMS curent (scris de callback-ul audio, citit de UI thread)
+        self.current_volume: float = 0.0
+
         # Selecteaza dispozitivul audio optim
         self._audio_device = None   # None = default sistem
         try:
@@ -533,6 +536,7 @@ class TTSEngine(QObject):
                 def callback(outdata, frames, time, status):
                     if self._sd_stop_event.is_set():
                         outdata[:] = 0
+                        self.current_volume = 0.0
                         raise sd.CallbackStop()
                     start = idx[0]
                     end   = start + frames
@@ -540,9 +544,13 @@ class TTSEngine(QObject):
                     if len(chunk) < frames:
                         outdata[:len(chunk)] = chunk.reshape(-1, nc) if nc > 1 else chunk.reshape(-1, 1)
                         outdata[len(chunk):] = 0
+                        self.current_volume = 0.0
                         raise sd.CallbackStop()
                     outdata[:] = chunk.reshape(-1, nc) if nc > 1 else chunk.reshape(-1, 1)
                     idx[0] = end
+                    # Lip-sync: RMS al chunk-ului curent (canal mono sau primul canal)
+                    c = chunk[:, 0] if nc > 1 else chunk
+                    self.current_volume = float(np.sqrt(np.mean(c * c)))
                 return callback, done
 
             # Incearca device ales; daca esueaza, fallback la None (default sistem)

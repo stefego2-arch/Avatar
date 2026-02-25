@@ -48,6 +48,12 @@
     let mixer, idleAction, talkAction, isTalking = false;
     const clock = new THREE.Clock();
 
+    // Lip-sync state
+    let jawMesh   = null;   // mesh-ul cu morphTarget jawOpen (dacă există)
+    let jawIndex  = -1;     // indexul în morphTargetInfluences
+    let _mouthTarget  = 0.0;  // valoarea trimisă din Python
+    let _mouthCurrent = 0.0;  // valoarea curentă (lerp spre target)
+
     const loader = new GLTFLoader();
     // Încărcăm modelul tău local
     loader.load("./model5.glb", (gltf) => {
@@ -66,7 +72,34 @@
         idleAction.play();
         if (talkClip) talkAction = mixer.clipAction(talkClip);
       }
+
+      // Caută morph target pentru maxilar pe toate mesh-urile din model
+      const JAW_NAMES = ['jawOpen','mouthOpen','Mouth_Open','jaw_open','JawOpen','mouthClose'];
+      model.traverse((child) => {
+        if (jawMesh) return;  // deja găsit
+        if (child.isMesh && child.morphTargetDictionary) {
+          for (const name of JAW_NAMES) {
+            if (child.morphTargetDictionary[name] !== undefined) {
+              jawMesh  = child;
+              jawIndex = child.morphTargetDictionary[name];
+              console.log(`[lip-sync] morph target "${name}" găsit pe "${child.name}" (idx=${jawIndex})`);
+              break;
+            }
+          }
+          if (!jawMesh) {
+            // Afișează ce morph targets există (ajutor pentru debugging)
+            console.log(`[lip-sync] morph targets pe "${child.name}":`, Object.keys(child.morphTargetDictionary));
+          }
+        }
+      });
+      if (!jawMesh) console.log('[lip-sync] fără morph targets — folosesc fallback animație');
+
     }, undefined, (e) => console.error("GLB Error:", e));
+
+    // Apelat din Python la ~30fps cu volumul RMS normalizat [0..1]
+    window.setMouthOpening = function(value) {
+      _mouthTarget = value;
+    };
 
     window.setTalking = (v) => {
       isTalking = !!v;
@@ -77,12 +110,28 @@
       } else {
         talkAction.fadeOut(0.2);
         idleAction.reset().fadeIn(0.2).play();
+        _mouthTarget  = 0.0;  // forțăm gura închisă la oprire
       }
     };
 
     function animate() {
       requestAnimationFrame(animate);
-      if (mixer) mixer.update(clock.getDelta());
+      const dt = clock.getDelta();
+      if (mixer) mixer.update(dt);
+
+      // Lip-sync: lerp fluid spre target (evită tremuratul maxilarului)
+      const lerpSpeed = 14.0;
+      _mouthCurrent += (_mouthTarget - _mouthCurrent) * Math.min(1.0, lerpSpeed * dt);
+
+      if (jawMesh && jawIndex >= 0) {
+        // Morph target disponibil → control precis al maxilarului
+        jawMesh.morphTargetInfluences[jawIndex] = _mouthCurrent;
+      } else if (mixer && talkAction && isTalking) {
+        // Fallback: modulăm weight-ul animației de vorbit după volum
+        // (min 0.3 ca să nu dispară animația complet, max 1.0)
+        talkAction.weight = 0.3 + _mouthCurrent * 0.7;
+      }
+
       renderer.render(scene, camera);
     }
     animate();

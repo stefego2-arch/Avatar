@@ -1150,6 +1150,16 @@ class AvatarPanel(QWidget):
         except Exception:
             pass
 
+    def set_mouth_opening(self, volume: float):
+        """Trimite volumul RMS către JS pentru lip-sync audio-driven (~30fps)."""
+        # Amplificăm volumul — ElevenLabs PCM normalizat are RMS ~0.05-0.15
+        scaled = min(1.0, volume * 6.0)
+        js = f"if(typeof window.setMouthOpening==='function')window.setMouthOpening({scaled:.3f});"
+        try:
+            self.avatar_view.page().runJavaScript(js)
+        except Exception:
+            pass
+
     def set_message(self, text: str, emotion: str = "talking"):
         """Afișează mesaj avatar și schimbă expresia."""
         self._lbl_message.setText(text)
@@ -1368,6 +1378,11 @@ class MainWindow(QMainWindow):
             self.tts.finished.connect(lambda: self._avatar_panel.set_emotion("idle"))
         except Exception:
             pass
+
+        # Lip-sync timer: citește current_volume din TTS și trimite la avatar ~30fps
+        self._lip_sync_timer = QTimer(self)
+        self._lip_sync_timer.timeout.connect(self._update_lip_sync)
+        self._lip_sync_timer.start(33)   # 33ms ≈ 30 cadre/secundă
         self.attention = AttentionMonitor(camera_index=0)
 
         self.engine = LessonEngine(self.db, self.deepseek, self.tts)
@@ -1546,6 +1561,12 @@ class MainWindow(QMainWindow):
             _sd.play(audio.astype(np.float32), samplerate=sr, blocking=False)
         except Exception:
             pass
+
+    def _update_lip_sync(self):
+        """Citit de QTimer la ~30fps — trimite volumul curent TTS către avatar JS."""
+        if hasattr(self, '_avatar_panel'):
+            vol = self.tts.current_volume if self.tts.is_speaking() else 0.0
+            self._avatar_panel.set_mouth_opening(vol)
 
     def _prewarm_whisper(self):
         """Preîncarcă modelul faster-whisper în background la pornire.
