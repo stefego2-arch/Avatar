@@ -1,0 +1,53 @@
+# ── Credențiale (NICIODATĂ în git) ───────────────────
+.env
+*.env
+.env.local
+*.pem
+*.key
+
+# ── Baze de date ──────────────────────────────────────
+*.db
+*.db-shm
+*.db-wal
+
+# ── Log-uri ───────────────────────────────────────────
+*.log
+crash_native.log
+avatar_tutor.log
+
+# ── Python ────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# ── Virtual environment ───────────────────────────────
+.venv/
+venv/
+env/
+
+# ── Fișiere generate (regenerabile cu build_lesson_packs.py) ──
+lesson_packs/
+lesson_packs.zip
+
+# ── Manuale (conținut mare, copyright editorial) ──────
+manuale/
+manuale_main/
+
+# ── Modele TTS și Vosk (fișiere binare mari) ──────────
+piper_voices/
+vosk-model*/
+
+# ── Fișiere audio ─────────────────────────────────────
+*.wav
+*.mp3
+*.ogg
+
+# ── IDE ───────────────────────────────────────────────
+.vscode/
+.idea/
+.cursor/

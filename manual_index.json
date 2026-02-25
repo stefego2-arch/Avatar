@@ -1,0 +1,650 @@
+{
+  "Comunicare_in_limba_romana_1488.md": {
+    "file": "Comunicare_in_limba_romana_1488.md",
+    "subject": "Limba Română",
+    "grade": 2,
+    "title": "Comunicare în limba română : clasa a II-a",
+    "publisher": "booklet",
+    "priority": 30,
+    "is_default": false
+  },
+  "Comunicare_in_limba_romana_1489.md": {
+    "file": "Comunicare_in_limba_romana_1489.md",
+    "subject": "Limba Română",
+    "grade": 2,
+    "title": "Comunicare în limba română : clasa a II-a",
+    "publisher": "artklett",
+    "priority": 20,
+    "is_default": false
+  },
+  "Comunicare_in_limba_romana_1490.md": {
+    "file": "Comunicare_in_limba_romana_1490.md",
+    "subject": "Limba Română",
+    "grade": 2,
+    "title": "Comunicare în limba română : clasa a II-a",
+    "publisher": "artlibri",
+    "priority": 20,
+    "is_default": false
+  },
+  "Comunicare_in_limba_romana_1491.md": {
+    "file": "Comunicare_in_limba_romana_1491.md",
+    "subject": "Limba Română",
+    "grade": 2,
+    "title": "Comunicare în limba română : clasa a II-a",
+    "publisher": "paralela45",
+    "priority": 15,
+    "is_default": false
+  },
+  "Comunicare_in_limba_romana_1492.md": {
+    "file": "Comunicare_in_limba_romana_1492.md",
+    "subject": "Limba Română",
+    "grade": 2,
+    "title": "Comunicare în limba română : clasa a II-a",
+    "publisher": "EDU",
+    "priority": 1,
+    "is_default": true
+  },
+  "Comunicare_in_limba_romana_1493.md": {
+    "file": "Comunicare_in_limba_romana_1493.md",
+    "subject": "Limba Română",
+    "grade": 2,
+    "title": "Comunicare în limba română : clasa a II-a",
+    "publisher": "intuitext",
+    "priority": 3,
+    "is_default": false
+  },
+  "Comunicare_in_limba_romana_1494.md": {
+    "file": "Comunicare_in_limba_romana_1494.md",
+    "subject": "Limba Română",
+    "grade": 2,
+    "title": "Comunicare în limba română : clasa a II-a",
+    "publisher": "aramis",
+    "priority": 35,
+    "is_default": false
+  },
+  "Comunicare_in_limba_romana_1495.md": {
+    "file": "Comunicare_in_limba_romana_1495.md",
+    "subject": "Limba Română",
+    "grade": 2,
+    "title": "Comunicare în limba română : clasa a II-a",
+    "publisher": "litera",
+    "priority": 25,
+    "is_default": false
+  },
+  "Comunicare_in_limba_romana_1496.md": {
+    "file": "Comunicare_in_limba_romana_1496.md",
+    "subject": "Limba Română",
+    "grade": 2,
+    "title": "Comunicare în limba română : clasa a II-a",
+    "publisher": "cd_press",
+    "priority": 2,
+    "is_default": false
+  },
+  "Limba_si_literatura_romana_1098.md": {
+    "file": "Limba_si_literatura_romana_1098.md",
+    "subject": "Limba Română",
+    "grade": 4,
+    "title": "Comunicare în limba română : clasa a IV-a",
+    "publisher": "paralela45",
+    "priority": 15,
+    "is_default": false
+  },
+  "Limba_si_literatura_romana_1099.md": {
+    "file": "Limba_si_literatura_romana_1099.md",
+    "subject": "Limba Română",
+    "grade": 4,
+    "title": "Comunicare în limba română : clasa a IV-a",
+    "publisher": "artlibri",
+    "priority": 20,
+    "is_default": false
+  },
+  "Limba_si_literatura_romana_1100.md": {
+    "file": "Limba_si_literatura_romana_1100.md",
+    "subject": "Limba Română",
+    "grade": 4,
+    "title": "Comunicare în limba română : clasa a IV-a",
+    "publisher": "intuitext",
+    "priority": 3,
+    "is_default": false
+  },
+  "Limba_si_literatura_romana_1101.md": {
+    "file": "Limba_si_literatura_romana_1101.md",
+    "subject": "Limba Română",
+    "grade": 4,
+    "title": "Comunicare în limba română : clasa a IV-a",
+    "publisher": "litera",
+    "priority": 25,
+    "is_default": false
+  },
+  "Limba_si_literatura_romana_1102.md": {
+    "file": "Limba_si_literatura_romana_1102.md",
+    "subject": "Limba Română",
+    "grade": 4,
+    "title": "Comunicare în limba română : clasa a IV-a",
+    "publisher": "artklett",
+    "priority": 20,
+    "is_default": false
+  },
+  "Limba_si_literatura_romana_1103.md": {
+    "file": "Limba_si_literatura_romana_1103.md",
+    "subject": "Limba Română",
+    "grade": 4,
+    "title": "Comunicare în limba română : clasa a IV-a",
+    "publisher": "cd_press",
+    "priority": 2,
+    "is_default": true
+  },
+  "Limba_si_literatura_romana_1126.md": {
+    "file": "Limba_si_literatura_romana_1126.md",
+    "subject": "Limba Română",
+    "grade": 3,
+    "title": "Comunicare în limba română : clasa a III-a",
+    "publisher": "paralela45",
+    "priority": 15,
+    "is_default": false
+  },
+  "Limba_si_literatura_romana_1127.md": {
+    "file": "Limba_si_literatura_romana_1127.md",
+    "subject": "Limba Română",
+    "grade": 3,
+    "title": "Comunicare în limba română : clasa a III-a",
+    "publisher": "intuitext",
+    "priority": 3,
+    "is_default": false
+  },
+  "Limba_si_literatura_romana_1128.md": {
+    "file": "Limba_si_literatura_romana_1128.md",
+    "subject": "Limba Română",
+    "grade": 3,
+    "title": "Comunicare în limba română : clasa a III-a",
+    "publisher": "artlibri",
+    "priority": 20,
+    "is_default": false
+  },
+  "Limba_si_literatura_romana_1129.md": {
+    "file": "Limba_si_literatura_romana_1129.md",
+    "subject": "Limba Română",
+    "grade": 3,
+    "title": "Comunicare în limba română : clasa a III-a",
+    "publisher": "aramis",
+    "priority": 35,
+    "is_default": false
+  },
+  "Limba_si_literatura_romana_1130.md": {
+    "file": "Limba_si_literatura_romana_1130.md",
+    "subject": "Limba Română",
+    "grade": 3,
+    "title": "Comunicare în limba română : clasa a III-a",
+    "publisher": "litera",
+    "priority": 25,
+    "is_default": false
+  },
+  "Limba_si_literatura_romana_1131.md": {
+    "file": "Limba_si_literatura_romana_1131.md",
+    "subject": "Limba Română",
+    "grade": 3,
+    "title": "Comunicare în limba română : clasa a III-a",
+    "publisher": "cd_press",
+    "priority": 2,
+    "is_default": true
+  },
+  "Limba_si_literatura_romana_1132.md": {
+    "file": "Limba_si_literatura_romana_1132.md",
+    "subject": "Limba Română",
+    "grade": 3,
+    "title": "Comunicare în limba română : clasa a III-a",
+    "publisher": "artklett",
+    "priority": 20,
+    "is_default": false
+  },
+  "Limba_si_literatura_romana_1133.md": {
+    "file": "Limba_si_literatura_romana_1133.md",
+    "subject": "Limba Română",
+    "grade": 3,
+    "title": "Comunicare în limba română : clasa a III-a",
+    "publisher": "corint",
+    "priority": 10,
+    "is_default": false
+  },
+  "Limba_si_literatura_romana_1134.md": {
+    "file": "Limba_si_literatura_romana_1134.md",
+    "subject": "Limba Română",
+    "grade": 3,
+    "title": "Comunicare în limba română : clasa a III-a",
+    "publisher": "booklet",
+    "priority": 30,
+    "is_default": false
+  },
+  "Limba_si_literatura_romana_1246.md": {
+    "file": "Limba_si_literatura_romana_1246.md",
+    "subject": "Limba Română",
+    "grade": 5,
+    "title": "Comunicare în limba română : clasa a V-a",
+    "publisher": "booklet",
+    "priority": 30,
+    "is_default": false
+  },
+  "Limba_si_literatura_romana_1247.md": {
+    "file": "Limba_si_literatura_romana_1247.md",
+    "subject": "Limba Română",
+    "grade": 5,
+    "title": "Comunicare în limba română : clasa a V-a",
+    "publisher": "artklett",
+    "priority": 20,
+    "is_default": false
+  },
+  "Limba_si_literatura_romana_1248.md": {
+    "file": "Limba_si_literatura_romana_1248.md",
+    "subject": "Limba Română",
+    "grade": 5,
+    "title": "Comunicare în limba română : clasa a V-a",
+    "publisher": "corint",
+    "priority": 10,
+    "is_default": false
+  },
+  "Limba_si_literatura_romana_1249.md": {
+    "file": "Limba_si_literatura_romana_1249.md",
+    "subject": "Limba Română",
+    "grade": 5,
+    "title": "Comunicare în limba română : clasa a V-a",
+    "publisher": "litera",
+    "priority": 25,
+    "is_default": false
+  },
+  "Limba_si_literatura_romana_1250.md": {
+    "file": "Limba_si_literatura_romana_1250.md",
+    "subject": "Limba Română",
+    "grade": 5,
+    "title": "Comunicare în limba română : clasa a V-a",
+    "publisher": "intuitext",
+    "priority": 3,
+    "is_default": false
+  },
+  "Limba_si_literatura_romana_1251.md": {
+    "file": "Limba_si_literatura_romana_1251.md",
+    "subject": "Limba Română",
+    "grade": 5,
+    "title": "Comunicare în limba română : clasa a V-a",
+    "publisher": "cd_press",
+    "priority": 2,
+    "is_default": true
+  },
+  "Matematica_1105.md": {
+    "file": "Matematica_1105.md",
+    "subject": "Matematică",
+    "grade": 3,
+    "title": " MATEMATICĂ clasa a III-a ",
+    "publisher": "editura_didactica_si_pedagogica",
+    "priority": 1,
+    "is_default": true
+  },
+  "Matematica_1106.md": {
+    "file": "Matematica_1106.md",
+    "subject": "Matematică",
+    "grade": 3,
+    "title": "MATEMATICĂ clasa a III-a ",
+    "publisher": "intuitext",
+    "priority": 3,
+    "is_default": false
+  },
+  "Matematica_1107.md": {
+    "file": "Matematica_1107.md",
+    "subject": "Matematică",
+    "grade": 3,
+    "title": "MATEMATICĂ clasa a III-a ",
+    "publisher": "artklett",
+    "priority": 20,
+    "is_default": false
+  },
+  "Comunicare_in_limba_romana_1366.md": {
+    "file": "Comunicare_in_limba_romana_1366.md",
+    "subject": "Limba Română",
+    "grade": 1,
+    "title": "Limba Română clasa 1",
+    "publisher": "edp",
+    "priority": 1,
+    "is_default": true
+  },
+  "Comunicare_in_limba_romana_1368.md": {
+    "file": "Comunicare_in_limba_romana_1368.md",
+    "subject": "Limba Română",
+    "grade": 1,
+    "title": "Limba Română clasa 1",
+    "publisher": "necunoscut",
+    "priority": 99,
+    "is_default": false
+  },
+  "Comunicare_in_limba_romana_1369.md": {
+    "file": "Comunicare_in_limba_romana_1369.md",
+    "subject": "Limba Română",
+    "grade": 1,
+    "title": "Limba Română clasa 1",
+    "publisher": "necunoscut",
+    "priority": 99,
+    "is_default": false
+  },
+  "Comunicare_in_limba_romana_1370.md": {
+    "file": "Comunicare_in_limba_romana_1370.md",
+    "subject": "Limba Română",
+    "grade": 1,
+    "title": "Limba Română clasa 1",
+    "publisher": "necunoscut",
+    "priority": 99,
+    "is_default": false
+  },
+  "Comunicare_in_limba_romana_1372.md": {
+    "file": "Comunicare_in_limba_romana_1372.md",
+    "subject": "Limba Română",
+    "grade": 1,
+    "title": "Limba Română clasa 1",
+    "publisher": "booklet",
+    "priority": 30,
+    "is_default": false
+  },
+  "Comunicare_in_limba_romana_1373.md": {
+    "file": "Comunicare_in_limba_romana_1373.md",
+    "subject": "Limba Română",
+    "grade": 1,
+    "title": "Limba Română clasa 1",
+    "publisher": "necunoscut",
+    "priority": 99,
+    "is_default": false
+  },
+  "Comunicare_in_limba_romana_1375.md": {
+    "file": "Comunicare_in_limba_romana_1375.md",
+    "subject": "Limba Română",
+    "grade": 1,
+    "title": "Limba Română clasa 1",
+    "publisher": "necunoscut",
+    "priority": 99,
+    "is_default": false
+  },
+  "Comunicare_in_limba_romana_1376.md": {
+    "file": "Comunicare_in_limba_romana_1376.md",
+    "subject": "Limba Română",
+    "grade": 1,
+    "title": "Limba Română clasa 1",
+    "publisher": "necunoscut",
+    "priority": 99,
+    "is_default": false
+  },
+  "Comunicare_in_limba_romana_1377.md": {
+    "file": "Comunicare_in_limba_romana_1377.md",
+    "subject": "Limba Română",
+    "grade": 1,
+    "title": "Limba Română clasa 1",
+    "publisher": "necunoscut",
+    "priority": 99,
+    "is_default": false
+  },
+  "Comunicare_in_limba_romana_1378.md": {
+    "file": "Comunicare_in_limba_romana_1378.md",
+    "subject": "Limba Română",
+    "grade": 1,
+    "title": "Limba Română clasa 1",
+    "publisher": "necunoscut",
+    "priority": 99,
+    "is_default": false
+  },
+  "Comunicare_in_limba_romana_1379.md": {
+    "file": "Comunicare_in_limba_romana_1379.md",
+    "subject": "Limba Română",
+    "grade": 1,
+    "title": "Limba Română clasa 1",
+    "publisher": "necunoscut",
+    "priority": 99,
+    "is_default": false
+  },
+  "Matematica_si_explorarea_mediului_1502.md": {
+    "file": "Matematica_si_explorarea_mediului_1502.md",
+    "subject": "Matematică",
+    "grade": 1,
+    "title": "Matematică clasa 1",
+    "publisher": "booklet",
+    "priority": 30,
+    "is_default": false
+  },
+  "Matematica_si_explorarea_mediului_1503.md": {
+    "file": "Matematica_si_explorarea_mediului_1503.md",
+    "subject": "Matematică",
+    "grade": 1,
+    "title": "Matematică clasa 1",
+    "publisher": "necunoscut",
+    "priority": 99,
+    "is_default": false
+  },
+  "Matematica_si_explorarea_mediului_1504.md": {
+    "file": "Matematica_si_explorarea_mediului_1504.md",
+    "subject": "Matematică",
+    "grade": 1,
+    "title": "Matematică clasa 1",
+    "publisher": "necunoscut",
+    "priority": 99,
+    "is_default": false
+  },
+  "Matematica_si_explorarea_mediului_1505.md": {
+    "file": "Matematica_si_explorarea_mediului_1505.md",
+    "subject": "Matematică",
+    "grade": 1,
+    "title": "Matematică clasa 1",
+    "publisher": "necunoscut",
+    "priority": 99,
+    "is_default": false
+  },
+  "Matematica_si_explorarea_mediului_1506.md": {
+    "file": "Matematica_si_explorarea_mediului_1506.md",
+    "subject": "Matematică",
+    "grade": 1,
+    "title": "Matematică clasa 1",
+    "publisher": "necunoscut",
+    "priority": 99,
+    "is_default": false
+  },
+  "Matematica_si_explorarea_mediului_1507.md": {
+    "file": "Matematica_si_explorarea_mediului_1507.md",
+    "subject": "Matematică",
+    "grade": 1,
+    "title": "Matematică clasa 1",
+    "publisher": "necunoscut",
+    "priority": 99,
+    "is_default": false
+  },
+  "Matematica_si_explorarea_mediului_1508.md": {
+    "file": "Matematica_si_explorarea_mediului_1508.md",
+    "subject": "Matematică",
+    "grade": 1,
+    "title": "Matematică clasa 1",
+    "publisher": "necunoscut",
+    "priority": 99,
+    "is_default": false
+  },
+  "Matematica_Explorarea_Mediului_clasa1_CD_PRESS.md": {
+    "file": "Matematica_Explorarea_Mediului_clasa1_CD_PRESS.md",
+    "subject": "Matematică",
+    "grade": 1,
+    "title": "Matematică și Explorarea Mediului clasa 1 (CD Press)",
+    "publisher": "cd_press",
+    "priority": 99,
+    "is_default": true
+  },
+  "Matematica_si_explorarea_mediului_1510.md": {
+    "file": "Matematica_si_explorarea_mediului_1510.md",
+    "subject": "Matematică",
+    "grade": 2,
+    "title": "Matematică clasa 2",
+    "publisher": "necunoscut",
+    "priority": 99,
+    "is_default": false
+  },
+  "Matematica_si_explorarea_mediului_1512.md": {
+    "file": "Matematica_si_explorarea_mediului_1512.md",
+    "subject": "Matematică",
+    "grade": 2,
+    "title": "Matematică clasa 2",
+    "publisher": "booklet",
+    "priority": 30,
+    "is_default": true
+  },
+  "Matematica_si_explorarea_mediului_1513.md": {
+    "file": "Matematica_si_explorarea_mediului_1513.md",
+    "subject": "Matematică",
+    "grade": 2,
+    "title": "Matematică clasa 2",
+    "publisher": "necunoscut",
+    "priority": 99,
+    "is_default": false
+  },
+  "Matematica_si_explorarea_mediului_1514.md": {
+    "file": "Matematica_si_explorarea_mediului_1514.md",
+    "subject": "Matematică",
+    "grade": 2,
+    "title": "Matematică clasa 2",
+    "publisher": "necunoscut",
+    "priority": 99,
+    "is_default": false
+  },
+  "Matematica_si_explorarea_mediului_1515.md": {
+    "file": "Matematica_si_explorarea_mediului_1515.md",
+    "subject": "Matematică",
+    "grade": 2,
+    "title": "Matematică clasa 2",
+    "publisher": "necunoscut",
+    "priority": 99,
+    "is_default": false
+  },
+  "Matematica_1109.md": {
+    "file": "Matematica_1109.md",
+    "subject": "Matematică",
+    "grade": 3,
+    "title": "Matematică clasa 3",
+    "publisher": "necunoscut",
+    "priority": 99,
+    "is_default": false
+  },
+  "Matematica_1111.md": {
+    "file": "Matematica_1111.md",
+    "subject": "Matematică",
+    "grade": 3,
+    "title": "Matematică clasa 3",
+    "publisher": "necunoscut",
+    "priority": 99,
+    "is_default": false
+  },
+  "Matematica_1112.md": {
+    "file": "Matematica_1112.md",
+    "subject": "Matematică",
+    "grade": 3,
+    "title": "Matematică clasa 3",
+    "publisher": "necunoscut",
+    "priority": 99,
+    "is_default": false
+  },
+  "Matematica_1115.md": {
+    "file": "Matematica_1115.md",
+    "subject": "Matematică",
+    "grade": 4,
+    "title": "Matematică clasa 4",
+    "publisher": "necunoscut",
+    "priority": 99,
+    "is_default": false
+  },
+  "Matematica_1116.md": {
+    "file": "Matematica_1116.md",
+    "subject": "Matematică",
+    "grade": 4,
+    "title": "Matematică clasa 4",
+    "publisher": "necunoscut",
+    "priority": 99,
+    "is_default": false
+  },
+  "Matematica_1119.md": {
+    "file": "Matematica_1119.md",
+    "subject": "Matematică",
+    "grade": 4,
+    "title": "Matematică clasa 4",
+    "publisher": "necunoscut",
+    "priority": 99,
+    "is_default": false
+  },
+  "Matematica_1334.md": {
+    "file": "Matematica_1334.md",
+    "subject": "Matematică",
+    "grade": 4,
+    "title": "Matematică clasa 4",
+    "publisher": "necunoscut",
+    "priority": 99,
+    "is_default": false
+  },
+  "Matematica_1355.md": {
+    "file": "Matematica_1355.md",
+    "subject": "Matematică",
+    "grade": 4,
+    "title": "Matematică clasa 4",
+    "publisher": "edp",
+    "priority": 1,
+    "is_default": true
+  },
+  "Matematica_1254.md": {
+    "file": "Matematica_1254.md",
+    "subject": "Matematică",
+    "grade": 5,
+    "title": "Matematică clasa 5",
+    "publisher": "booklet",
+    "priority": 30,
+    "is_default": true
+  },
+  "Matematica_1255.md": {
+    "file": "Matematica_1255.md",
+    "subject": "Matematică",
+    "grade": 5,
+    "title": "Matematică clasa 5",
+    "publisher": "necunoscut",
+    "priority": 99,
+    "is_default": false
+  },
+  "Matematica_1256.md": {
+    "file": "Matematica_1256.md",
+    "subject": "Matematică",
+    "grade": 5,
+    "title": "Matematică clasa 5",
+    "publisher": "necunoscut",
+    "priority": 99,
+    "is_default": false
+  },
+  "Matematica_1257.md": {
+    "file": "Matematica_1257.md",
+    "subject": "Matematică",
+    "grade": 5,
+    "title": "Matematică clasa 5",
+    "publisher": "necunoscut",
+    "priority": 99,
+    "is_default": false
+  },
+  "Matematica_1258.md": {
+    "file": "Matematica_1258.md",
+    "subject": "Matematică",
+    "grade": 5,
+    "title": "Matematică clasa 5",
+    "publisher": "necunoscut",
+    "priority": 99,
+    "is_default": false
+  },
+  "Matematica_1259.md": {
+    "file": "Matematica_1259.md",
+    "subject": "Matematică",
+    "grade": 5,
+    "title": "Matematică clasa 5",
+    "publisher": "necunoscut",
+    "priority": 99,
+    "is_default": false
+  },
+  "Matematica_1260.md": {
+    "file": "Matematica_1260.md",
+    "subject": "Matematică",
+    "grade": 5,
+    "title": "Matematică clasa 5",
+    "publisher": "necunoscut",
+    "priority": 99,
+    "is_default": false
+  }
+}

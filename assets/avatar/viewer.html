@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Avatar Viewer</title>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #0f1115; }
+    #c { width: 100vw; height: 100vh; display: block; }
+  </style>
+  
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <canvas id="c"></canvas>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+    const canvas = document.getElementById("c");
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.setClearColor(0x0d1117, 1);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(25, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 1.80, 1.1);
+    camera.lookAt(0, 1.65, 0);
+
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 2.0));
+    const light = new THREE.DirectionalLight(0xffffff, 1.5);
+    light.position.set(2, 2, 2);
+    scene.add(light);
+
+    const avatarGroup = new THREE.Group();
+    scene.add(avatarGroup);
+
+    let mixer, idleAction, talkAction, isTalking = false;
+    const clock = new THREE.Clock();
+
+    const loader = new GLTFLoader();
+    // Încărcăm modelul tău local
+    loader.load("./model5.glb", (gltf) => {
+      const model = gltf.scene;
+      // Model era deja cu fata spre camera (rotation.y = 0)
+      // Math.PI il intorcea cu spatele — lasam 0
+      model.rotation.y = +0.7;   // corecție ușoară spre stânga (~11°)
+      avatarGroup.add(model);
+
+      if (gltf.animations.length) {
+        mixer = new THREE.AnimationMixer(model);
+        const idleClip = gltf.animations.find(a => /idle/i.test(a.name)) || gltf.animations[0];
+        const talkClip = gltf.animations.find(a => /talk|speak/i.test(a.name));
+
+        idleAction = mixer.clipAction(idleClip);
+        idleAction.play();
+        if (talkClip) talkAction = mixer.clipAction(talkClip);
+      }
+    }, undefined, (e) => console.error("GLB Error:", e));
+
+    window.setTalking = (v) => {
+      isTalking = !!v;
+      if (!mixer || !talkAction) return;
+      if (isTalking) {
+        idleAction.fadeOut(0.2);
+        talkAction.reset().fadeIn(0.2).play();
+      } else {
+        talkAction.fadeOut(0.2);
+        idleAction.reset().fadeIn(0.2).play();
+      }
+    };
+
+    function animate() {
+      requestAnimationFrame(animate);
+      if (mixer) mixer.update(clock.getDelta());
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
