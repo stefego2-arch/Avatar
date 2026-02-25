@@ -35,6 +35,7 @@ from md_library import classify_chunk
 
 class LessonState(Enum):
     IDLE         = auto()
+    WARMUP       = auto()   # SRS: recapitulare exerciții din sesiuni anterioare
     PRE_TEST     = auto()
     LESSON_INTRO = auto()
     LESSON_CHUNK = auto()
@@ -63,6 +64,8 @@ class LessonSession:
     lesson: dict
     state: LessonState = LessonState.IDLE
 
+    warmup_exercises:   list = field(default_factory=list)   # SRS due items
+    srs_exercise_ids:   set  = field(default_factory=set)    # IDs ale exercițiilor SRS (pentru update)
     pretest_exercises:  list = field(default_factory=list)
     practice_exercises: list = field(default_factory=list)
     posttest_exercises: list = field(default_factory=list)
@@ -221,8 +224,14 @@ class LessonEngine:
 
         self.session.session_id = self.db.start_session(user_id, lesson_id, "full")
 
-        # Skip pre-test if there are no pretest exercises (avoids confusing stuck state)
-        if self.session.pretest_exercises:
+        # SRS Jocul de Încălzire — exerciții scadente din sesiuni anterioare
+        srs_due = self.db.get_srs_due(user_id, limit=3)
+        if srs_due:
+            self.session.warmup_exercises = srs_due
+            self.session.srs_exercise_ids = {ex["id"] for ex in srs_due}
+            self._transition_to(LessonState.WARMUP)
+            self._start_warmup()
+        elif self.session.pretest_exercises:
             self._transition_to(LessonState.PRE_TEST)
             self._start_pretest()
         else:
@@ -329,6 +338,20 @@ class LessonEngine:
     # ───────────────────────────────────────────────────────────────────
     # Phase starts
     # ───────────────────────────────────────────────────────────────────
+
+    def _start_warmup(self):
+        """SRS Jocul de Încălzire — recapitulăm exerciții din lecțiile anterioare."""
+        self.session.current_exercise_idx = 0
+        self.session.current_hints_used   = 0
+        n = len(self.session.warmup_exercises)
+        self._speak(
+            f"Jocul de Încălzire! Hai să recapitulăm {n} exerciții din lecțiile anterioare "
+            "înainte să începem ceva nou.",
+            "talking",
+        )
+        if self.on_state_change:
+            self.on_state_change(LessonState.WARMUP)
+        self._show_current_exercise()
 
     def _start_pretest(self):
         self.session.current_exercise_idx = 0
@@ -437,6 +460,8 @@ class LessonEngine:
         if not self.session:
             return []
         st = self.session.state
+        if st == LessonState.WARMUP:
+            return self.session.warmup_exercises
         if st == LessonState.PRE_TEST:
             return self.session.pretest_exercises
         if st == LessonState.PRACTICE:
@@ -563,6 +588,14 @@ class LessonEngine:
                 weight=weight,
             )
 
+        # SRS — actualizare sau programare la prima întâlnire (orice exercițiu cu id > 0)
+        if qr.exercise_id > 0 and self.session.session_id:
+            quality = self._calc_srs_quality(
+                qr.is_correct, qr.hints_used, qr.time_sec,
+                avg_time=self.session.avg_answer_time or 30.0,
+            )
+            self.db.record_srs_answer(self.session.user_id, qr.exercise_id, quality)
+
         # Error bank: exercițiul greșit se reprogramează pentru sesiunile viitoare
         if not is_correct and qr.exercise_id > 0:
             self.db.mark_exercise_wrong(self.session.user_id, qr.exercise_id)
@@ -593,6 +626,16 @@ class LessonEngine:
 
     def _complete_phase(self):
         st = self.session.state
+
+        if st == LessonState.WARMUP:
+            self._speak("Bine! Încălzire gata. Acum trecem la lecția de azi!", "happy")
+            if self.session.pretest_exercises:
+                self._transition_to(LessonState.PRE_TEST)
+                self._start_pretest()
+            else:
+                self._start_intro()
+            return
+
         if st == LessonState.PRE_TEST:
             score = self.session.get_pretest_score()
             if self.on_phase_complete:
@@ -654,6 +697,21 @@ class LessonEngine:
     # ───────────────────────────────────────────────────────────────────
     # Utils
     # ───────────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _calc_srs_quality(is_correct: bool, hints_used: int, time_sec: float,
+                          avg_time: float = 30.0) -> int:
+        """Mapează performanța → quality SM-2 (0-5)."""
+        if not is_correct:
+            return 1
+        if hints_used >= 2:
+            return 2
+        if hints_used == 1:
+            return 3
+        # Corect fără hint: distingem rapid vs. lent
+        if time_sec > 0 and avg_time > 0 and time_sec <= avg_time * 0.7:
+            return 5
+        return 4
 
     def _split_theory(self, text: str) -> list:
         # split pe paragrafe, dar păstrează paragrafe utile

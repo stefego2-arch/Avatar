@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Iterable
 
 
@@ -147,6 +147,18 @@ class Database:
                 wrong_count INTEGER DEFAULT 0,
                 retry_after TEXT,   -- ISO date "YYYY-MM-DD", NULL = nu e programat
                 PRIMARY KEY (user_id, exercise_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS srs_queue (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id       INTEGER NOT NULL,
+                exercise_id   INTEGER NOT NULL,
+                interval_days INTEGER DEFAULT 1,
+                ease_factor   REAL    DEFAULT 2.5,
+                repetitions   INTEGER DEFAULT 0,
+                due_date      TEXT    NOT NULL,     -- YYYY-MM-DD
+                last_reviewed TEXT,
+                UNIQUE(user_id, exercise_id)
             );
         """)
         self._conn.commit()
@@ -1945,6 +1957,78 @@ class Database:
             "progress": [dict(r) for r in progress],
             "skills":   [dict(r) for r in skills],
         }
+
+    # ── SRS (Spaced Repetition System) ───────────────────────────────────────
+
+    def get_srs_due(self, user_id: int, limit: int = 3) -> list[dict]:
+        """Returnează exerciții scadente pentru review (due_date <= azi)."""
+        today = datetime.now().strftime("%Y-%m-%d")
+        rows = self._conn.execute(
+            """SELECT e.id, e.enunt, e.raspuns, e.hint1, e.hint2, e.hint3,
+                      e.explicatie, e.dificultate, e.skill_codes, e.lesson_id,
+                      srs.repetitions, srs.ease_factor
+               FROM srs_queue srs
+               JOIN exercises e ON e.id = srs.exercise_id
+               WHERE srs.user_id = ? AND srs.due_date <= ?
+               ORDER BY srs.due_date ASC
+               LIMIT ?""",
+            (int(user_id), today, limit),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def record_srs_answer(self, user_id: int, exercise_id: int, quality: int):
+        """SM-2 upsert: INSERT la prima întâlnire, UPDATE la recapitulare.
+
+        quality 0-5:
+          5 = corect, fără hint, rapid    4 = corect, fără hint
+          3 = corect cu un hint           2 = corect cu 2+ hint-uri
+          1 = greșit                      0 = complet uitat
+        """
+        uid  = int(user_id)
+        eid  = int(exercise_id)
+        now  = datetime.now().isoformat(timespec="seconds")
+        due1 = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+
+        # Inserăm doar dacă nu există (idempotent la prima întâlnire)
+        self._conn.execute(
+            """INSERT OR IGNORE INTO srs_queue
+               (user_id, exercise_id, interval_days, ease_factor, repetitions, due_date, last_reviewed)
+               VALUES (?, ?, 1, 2.5, 0, ?, ?)""",
+            (uid, eid, due1, now),
+        )
+
+        # Citim valorile curente și aplicăm SM-2
+        row = self._conn.execute(
+            "SELECT * FROM srs_queue WHERE user_id=? AND exercise_id=?",
+            (uid, eid),
+        ).fetchone()
+        if row is None:
+            self._conn.commit()
+            return
+
+        r  = dict(row)
+        n  = int(r.get("repetitions") or 0)
+        ef = float(r.get("ease_factor") or 2.5)
+        iv = int(r.get("interval_days") or 1)
+
+        if quality >= 3:
+            if n == 0:    new_iv = 1
+            elif n == 1:  new_iv = 6
+            else:         new_iv = max(1, round(iv * ef))
+            new_n  = n + 1
+            new_ef = max(1.3, ef + 0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02))
+        else:
+            new_iv, new_n = 1, 0
+            new_ef = max(1.3, ef - 0.2)
+
+        due = (datetime.now() + timedelta(days=new_iv)).strftime("%Y-%m-%d")
+        self._conn.execute(
+            """UPDATE srs_queue
+               SET interval_days=?, ease_factor=?, repetitions=?, due_date=?, last_reviewed=?
+               WHERE user_id=? AND exercise_id=?""",
+            (new_iv, new_ef, new_n, due, now, uid, eid),
+        )
+        self._conn.commit()
 
     def close(self):
         try:
