@@ -168,12 +168,23 @@ class Database:
             "ALTER TABLE user_skill ADD COLUMN last_practiced TEXT",
             "ALTER TABLE user_skill ADD COLUMN avg_time REAL DEFAULT 0.0",
             "ALTER TABLE user_skill ADD COLUMN skill_streak INTEGER DEFAULT 0",
+            # ITS v2: tier 4 "Boss Fight" + sursa examen real
+            "ALTER TABLE exercises ADD COLUMN difficulty_tier INTEGER DEFAULT 1",
+            "ALTER TABLE exercises ADD COLUMN source_exam TEXT",
         ]
         for sql in migrations:
             try:
                 self._conn.execute(sql)
             except Exception:
                 pass  # coloana exista deja
+        # Backfill: copiază dificultate → difficulty_tier pentru exerciții existente
+        try:
+            self._conn.execute(
+                "UPDATE exercises SET difficulty_tier = dificultate "
+                "WHERE difficulty_tier IS NULL OR difficulty_tier = 1"
+            )
+        except Exception:
+            pass
         self._conn.commit()
 
     # ───────────────────────────────────────────────────────────────────
@@ -1673,6 +1684,21 @@ class Database:
         return [dict(r) for r in rows]
 
 
+    def can_access_tier4(self, user_id: int, skill_codes: list) -> bool:
+        """Tier 4 (Boss Fight / Admitere) deblocat doar când mastery_level >= 2
+        pe TOATE skill-urile cerute. Fără skill_codes → blocat implicit."""
+        if not skill_codes:
+            return False
+        placeholders = ",".join("?" * len(skill_codes))
+        rows = self._conn.execute(
+            f"SELECT mastery_level FROM user_skill "
+            f"WHERE user_id=? AND skill_code IN ({placeholders})",
+            [int(user_id)] + list(skill_codes),
+        ).fetchall()
+        if len(rows) < len(skill_codes):
+            return False   # Utilizatorul nu a practicat toate skill-urile
+        return all((r["mastery_level"] or 0) >= 2 for r in rows)
+
     def select_adaptive_exercises(self, user_id: int, lesson_id: int,
                                    n: int = 8) -> list[dict]:
         """Returnează n exerciții ordonate adaptiv după skill mastery.
@@ -1682,6 +1708,7 @@ class Database:
           2. Exercițiile cu skill_codes unde mastery e mai scăzut sunt preferate.
           3. Dificultatea exercițiului este aliniată la nivelul curent al skill-ului:
              mastery_level 0 → dific 1, nivel 1 → dific 1-2, nivel 2 → dific 2-3, nivel 3 → dific 3.
+          4. Tier 4 (Boss Fight) exclus dacă utilizatorul nu are mastery_level >= 2.
         """
         from datetime import date
         today = date.today().isoformat()
@@ -1689,6 +1716,15 @@ class Database:
         all_exs = self.get_exercises(lesson_id, "practice", 50)
         if not all_exs:
             return []
+
+        # Tier 4 gating: exclude exerciții Boss Fight dacă mastery insufficient
+        all_skill_codes = list({c for e in all_exs for c in (e.get("skill_codes") or [])})
+        tier4_ok = self.can_access_tier4(user_id, all_skill_codes)
+        if not tier4_ok:
+            all_exs = [
+                e for e in all_exs
+                if int(e.get("difficulty_tier") or e.get("dificultate") or 1) < 4
+            ]
 
         # Construim dicționar skill_code → {level, mastery}
         skill_info: dict[str, dict] = {}

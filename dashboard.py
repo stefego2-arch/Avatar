@@ -246,6 +246,16 @@ class DashboardScreen(QWidget):
         gb_weak.setLayout(vb_weak)
         self._content_layout.addWidget(gb_weak)
 
+        # ── Radar "Profil de Competențe" ─────────────────────────────────────
+        gb_radar = QGroupBox("🕸️  Profil de Competențe")
+        gb_radar.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+        gb_radar.setStyleSheet(self._card_style())
+        vb_radar = QVBoxLayout()
+        self._canvas_radar = ChartCanvas(figsize=(4, 4))
+        vb_radar.addWidget(self._canvas_radar)
+        gb_radar.setLayout(vb_radar)
+        self._content_layout.addWidget(gb_radar)
+
         self._content_layout.addStretch()
         content.setLayout(self._content_layout)
         scroll.setWidget(content)
@@ -307,6 +317,9 @@ class DashboardScreen(QWidget):
         self._card_streak.update_value(str(streak))
         self._card_timp.update_value(f"{total_min} min")
 
+        # ── Competency profile (date extinse pentru radar) ────────────────────
+        competency_profile = self._calc_competency_profile(uid)
+
         # ── Grafice (fiecare izolat: o eroare de grafic nu blochează celelalte) ─
         for draw_fn, arg in [
             (self._draw_score_timeline,    sessions),
@@ -314,6 +327,7 @@ class DashboardScreen(QWidget):
             (self._draw_skill_bars,         skills),
             (self._draw_hard_lessons,       progress),
             (self._draw_weak_skills,        skills),
+            (self._draw_competency_radar,   competency_profile),
         ]:
             try:
                 draw_fn(arg)
@@ -582,6 +596,94 @@ class DashboardScreen(QWidget):
             container = QWidget()
             container.setLayout(row)
             self._weak_skills_layout.addWidget(container)
+
+    # ── Radar: Profil de Competențe ───────────────────────────────────────────
+
+    def _calc_competency_profile(self, user_id: int) -> dict:
+        """Calculează 5 scoruri [0..1] pentru radar chart din user_skill."""
+        import numpy as _np
+        conn = self._db.conn
+        rows = conn.execute(
+            "SELECT us.skill_code, us.mastery, us.avg_time, us.skill_streak "
+            "FROM user_skill us "
+            "WHERE us.user_id = ?",
+            (user_id,)
+        ).fetchall()
+
+        buckets: dict[str, list] = {
+            "Matematică":   [],
+            "Română":       [],
+            "Logică/EN":    [],
+            "Viteză":       [],
+            "Consistență":  [],
+        }
+        for r in rows:
+            code   = (r[0] or "").upper()
+            mastery = float(r[1] or 0.0)
+            avg_t   = float(r[2] or 30.0)
+            streak  = int(r[3] or 0)
+
+            if code.startswith("MATH"):
+                buckets["Matematică"].append(mastery)
+            elif code.startswith("RO"):
+                buckets["Română"].append(mastery)
+            elif code.startswith("EN") or "LOGIC" in code:
+                buckets["Logică/EN"].append(mastery)
+
+            # Viteză: <15s → 1.0, >60s → 0.0 (liner clamp)
+            speed = max(0.0, min(1.0, 1.0 - (avg_t - 15.0) / 45.0))
+            buckets["Viteză"].append(speed)
+
+            # Consistență: streak 10+ → 1.0
+            buckets["Consistență"].append(min(1.0, streak / 10.0))
+
+        return {k: (sum(v) / len(v) if v else 0.0) for k, v in buckets.items()}
+
+    def _draw_competency_radar(self, profile: dict):
+        """Radar/spider chart — profilul de competențe al elevului."""
+        import numpy as np
+        fig = self._canvas_radar.fig
+        fig.clear()
+
+        if not any(v > 0 for v in profile.values()):
+            ax = fig.add_subplot(111)
+            ax.text(0.5, 0.5, "Date insuficiente\nFă mai multe exerciții!",
+                    ha="center", va="center", fontsize=11, color="#7f8c8d")
+            ax.axis("off")
+            fig.patch.set_facecolor(C_BG)
+            self._canvas_radar.draw()
+            return
+
+        labels = list(profile.keys())
+        values = list(profile.values())
+        N = len(labels)
+
+        angles = [n / float(N) * 2 * np.pi for n in range(N)]
+        # închide poligonul
+        plot_angles = angles + angles[:1]
+        plot_values = values + values[:1]
+
+        ax = fig.add_subplot(111, polar=True)
+        ax.set_facecolor("#f0f4f8")
+        fig.patch.set_facecolor(C_BG)
+
+        # Grilă
+        ax.set_ylim(0, 1)
+        ax.set_yticks([0.25, 0.5, 0.75, 1.0])
+        ax.set_yticklabels(["25%", "50%", "75%", "100%"], fontsize=7, color="#95a5a6")
+        ax.set_xticks(angles)
+        ax.set_xticklabels(labels, fontsize=9, color="#2c3e50")
+        ax.grid(color="#bdc3c7", linestyle="--", alpha=0.5)
+
+        # Zona colorată
+        ax.plot(plot_angles, plot_values, "o-", linewidth=2, color="#3498db")
+        ax.fill(plot_angles, plot_values, alpha=0.25, color="#3498db")
+
+        ax.set_title("Profil Competențe", fontsize=11, fontweight="bold",
+                     pad=18, color="#2c3e50")
+
+        fig.tight_layout()
+        self._canvas_radar.draw()
 
     # ── Streak calc ───────────────────────────────────────────────────────────
 

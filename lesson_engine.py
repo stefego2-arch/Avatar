@@ -88,6 +88,11 @@ class LessonSession:
     avg_edits: float = 0.0
     answers_count: int = 0
 
+    # DDA (Dynamic Difficulty Adjustment) — tier intra-sesiune
+    current_tier:    int = 2   # 1=Basic, 2=Medium, 3=Advanced, 4=BossFight
+    tier_up_streak:  int = 0   # răspunsuri corecte consecutive → upgrade la 3
+    tier_down_count: int = 0   # greșeli consecutive → downgrade la 2
+
     def duration_seconds(self) -> int:
         return int(time.time() - self.started_at)
 
@@ -490,12 +495,32 @@ class LessonEngine:
         if is_correct:
             self.session.correct_streak += 1
             self.session.consecutive_wrong = 0
+            self.session.tier_up_streak += 1
+            self.session.tier_down_count = 0
             feedback = get_message("encourage")
         else:
             self.session.correct_streak = 0
             self.session.consecutive_wrong += 1
+            self.session.tier_up_streak = 0
+            self.session.tier_down_count += 1
             fb = self._mis.feedback(self.session.lesson.get("subject", ""), ex.get("enunt", ""), correct, user)
             feedback = fb or ex.get("explicatie") or get_message("try_again")
+
+        # DDA: tier upgrade la 3 răspunsuri corecte consecutive
+        if self.session.tier_up_streak >= 3 and self.session.current_tier < 3:
+            self.session.current_tier = min(3, self.session.current_tier + 1)
+            self.session.tier_up_streak = 0
+            tier_msg = f"Fantastic! Trecem la nivelul {self.session.current_tier} — exerciții mai dificile!"
+            if self.on_avatar_message:
+                self.on_avatar_message(tier_msg, "happy")
+
+        # DDA: tier downgrade la 2 greșeli consecutive
+        elif self.session.tier_down_count >= 2 and self.session.current_tier > 1:
+            self.session.current_tier = max(1, self.session.current_tier - 1)
+            self.session.tier_down_count = 0
+            tier_msg = f"Hai să consolidăm nivelul {self.session.current_tier} — ne pregătim mai bine!"
+            if self.on_avatar_message:
+                self.on_avatar_message(tier_msg, "neutral")
 
         qr = QuestionResult(
             exercise_id=int(ex.get("id", 0)),
