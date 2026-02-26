@@ -28,6 +28,14 @@ class AvatarPanel(QWidget):
     def _setup_ui(self):
         # Import tardiv — QWebEngineView trebuie instanțiat după QApplication + AA_ShareOpenGLContexts
         from PyQt6.QtWebEngineWidgets import QWebEngineView
+        from PyQt6.QtWebEngineCore import QWebEnginePage
+
+        # Pagină custom care forwardează consolul JS la terminalul Python.
+        # Fără aceasta, erorile Three.js (WebGL, import failures, GLB) dispar fără urmă.
+        class _DebugPage(QWebEnginePage):
+            def javaScriptConsoleMessage(self, level, msg, line, source):
+                tag = {0: "LOG", 1: "WARN", 2: "ERR "}.get(level, "?   ")
+                print(f"  [js:{tag}] {source}:{line}  {msg}")
 
         layout = QVBoxLayout()
         layout.setContentsMargins(10, 10, 10, 10)
@@ -35,6 +43,7 @@ class AvatarPanel(QWidget):
 
         # ── Avatar 3D (WebEngine → viewer.html) ───────────────────────────
         self.avatar_view = QWebEngineView()
+        self.avatar_view.setPage(_DebugPage(self.avatar_view))
         self.avatar_view.setFixedHeight(320)
         self.avatar_view.setUrl(QUrl("avatar://localhost/viewer.html"))
         self.avatar_view.page().setBackgroundColor(Qt.GlobalColor.black)

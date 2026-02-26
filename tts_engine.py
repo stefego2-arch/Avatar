@@ -191,7 +191,7 @@ class TTSEngine(QObject):
                 if v.get("name", "").lower() == voice_name.lower():
                     return v["voice_id"], v["name"]
             if voices:
-                preferred = ["jessica", "alice", "sarah", "matilda", "laura", "lily"]
+                preferred = ["roger", "rachel", "charlotte", "jessica", "alice", "sarah", "matilda", "laura", "lily"]
                 by_name = {v["name"].lower(): v for v in voices}
                 for pref in preferred:
                     if pref in by_name:
