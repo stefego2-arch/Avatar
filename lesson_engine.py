@@ -17,6 +17,7 @@ Import:
 
 from __future__ import annotations
 
+import re
 import time
 import threading
 from enum import Enum, auto
@@ -501,6 +502,21 @@ class LessonEngine:
             # nu avansăm chunk-ul
             self._show_current_chunk()
 
+    @staticmethod
+    def _normalize_answer(text: str) -> str:
+        """Normalizează un răspuns pentru comparare echitabilă.
+        203.000 == 203000 == 203 000 (separator de mii românesc).
+        Nu afectează zecimale reale (3.14 rămâne 3.14).
+        """
+        t = text.strip().lower()
+        # Separator de mii cu punct (notație românească): aplicăm de 2x pentru 1.234.567
+        t = re.sub(r"(\d{1,3})\.(\d{3})(?!\d)", r"\1\2", t)
+        t = re.sub(r"(\d{1,3})\.(\d{3})(?!\d)", r"\1\2", t)
+        # Separator de mii cu spațiu: "203 000" → "203000"
+        t = re.sub(r"(\d{1,3}) (\d{3})(?!\d)", r"\1\2", t)
+        t = re.sub(r"(\d{1,3}) (\d{3})(?!\d)", r"\1\2", t)
+        return t
+
     def _answer_exercise(self, answer: str, meta: dict):
         exercises = self._get_current_exercises()
         idx = self.session.current_exercise_idx
@@ -508,7 +524,17 @@ class LessonEngine:
 
         correct = (ex.get("raspuns") or "").strip()
         user = (answer or "").strip()
-        is_correct = (user.lower() == correct.lower())
+
+        # Comparam versiunile normalizate: 203.000 == 203000, 290 000 == 290000 etc.
+        correct_n = self._normalize_answer(correct)
+        user_n    = self._normalize_answer(user)
+        is_correct = (user_n == correct_n)
+
+        # Suport răspunsuri alternative ("32 sau 60"): oricare variantă e acceptată
+        if not is_correct and re.search(r"\bsau\b", correct, flags=re.IGNORECASE):
+            alts = [self._normalize_answer(a)
+                    for a in re.split(r"\s+sau\s+", correct, flags=re.IGNORECASE)]
+            is_correct = user_n in alts
 
         time_sec = float(meta.get("time_sec") or 0.0)
         edits = float(meta.get("edits") or 0.0)
