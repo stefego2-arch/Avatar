@@ -205,6 +205,12 @@ def sanitize_markdown_for_tts(text: str, *, keep_headings: bool = True) -> str:
     t = re.sub(r"Exerci[tț]iul\s+\d+\s*[:.]\s*", "", t, flags=re.IGNORECASE)
     t = re.sub(r"\n{3,}", "\n\n", t).strip()
 
+    # 16) separator de mii românesc (punct): 234.567 → 234 567
+    # Pattern: 1-3 cifre, punct, exact 3 cifre — distinge de zecimale (e.g. 3.14)
+    # Aplicăm de 2x pentru numere de forma 1.234.567
+    t = re.sub(r"(\d{1,3})\.(\d{3})(?!\d)", r"\1 \2", t)
+    t = re.sub(r"(\d{1,3})\.(\d{3})(?!\d)", r"\1 \2", t)
+
     return t
 
 

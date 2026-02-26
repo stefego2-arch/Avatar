@@ -690,7 +690,7 @@ class LessonEngine:
             f"Rezumat: Pre-test {pre:.0f}%, Practică {practice:.0f}%, Post-test {post:.0f}%.\n"
             f"Timp mediu/răspuns: {self.session.avg_answer_time:.1f}s, Editări medii: {self.session.avg_edits:.1f}.\n"
         )
-        summary += "Felicitări! Ai trecut lecția! 🏆" if passed else "Mai exersăm puțin și data viitoare o iei! 💪"
+        summary += "Felicitări! Ai trecut lectia!" if passed else "Bun efort! Mai exersam putin si data viitoare va fi mai usor!"
         self._speak(summary, "happy" if passed else "encouraging")
 
         self._transition_to(LessonState.DONE)
