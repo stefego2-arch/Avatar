@@ -9,7 +9,6 @@ import numpy as np
 
 from PyQt6.QtCore import Qt, QUrl
 from PyQt6.QtGui import QFont, QImage, QPixmap
-from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWidgets import (
     QGroupBox, QLabel, QProgressBar, QPushButton, QVBoxLayout, QWidget,
 )
@@ -27,6 +26,9 @@ class AvatarPanel(QWidget):
         self._setup_ui()
 
     def _setup_ui(self):
+        # Import tardiv — QWebEngineView trebuie instanțiat după QApplication + AA_ShareOpenGLContexts
+        from PyQt6.QtWebEngineWidgets import QWebEngineView
+
         layout = QVBoxLayout()
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)

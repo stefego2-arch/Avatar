@@ -12,6 +12,14 @@ os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS",
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 os.environ.setdefault("MKL_NUM_THREADS", "1")
+
+# ── AA_ShareOpenGLContexts — OBLIGATORIU înainte de QApplication ──────────────
+# Fără acest flag, Qt WebEngine (Chromium) nu poate partaja contextul OpenGL
+# cu restul aplicației → QWebEngineView afișează ecran negru.
+from PyQt6.QtCore import QCoreApplication as _QCA, Qt as _QtF
+_QCA.setAttribute(_QtF.ApplicationAttribute.AA_ShareOpenGLContexts, True)
+del _QCA, _QtF
+
 import io
 import json
 import time
@@ -20,8 +28,6 @@ import traceback
 import faulthandler
 from pathlib import Path
 from datetime import datetime
-from PyQt6.QtWebEngineWidgets import QWebEngineView
-from PyQt6.QtCore import QUrl
 from PyQt6.QtWidgets import QMainWindow, QVBoxLayout, QWidget
 
 
@@ -286,6 +292,9 @@ class MainWindow(QMainWindow):
     # ── Callbacks engine ──────────────────────────────────────────────────────
 
     def setup_avatar(self):
+        # Import tardiv — QWebEngineView trebuie instanțiat după QApplication + AA_ShareOpenGLContexts
+        from PyQt6.QtWebEngineWidgets import QWebEngineView
+        from PyQt6.QtCore import QUrl
         # 1. Crearea widget-ului
         self.avatar_view = QWebEngineView()
 
