@@ -586,6 +586,17 @@ class LessonEngine:
             meta=meta,
         )
 
+        # ── Stochează rezultatul în lista fazei curente ──────────────────────
+        # Fără acest append, get_practice_score() / get_posttest_score() returnează
+        # mereu 0.0 (lista goală), iar get_pretest_score() returnează 100.0 (fallback).
+        _st = self.session.state
+        if _st == LessonState.PRE_TEST:
+            self.session.pretest_results.append(qr)
+        elif _st == LessonState.PRACTICE:
+            self.session.practice_results.append(qr)
+        elif _st == LessonState.POST_TEST:
+            self.session.posttest_results.append(qr)
+
         # DB
         if self.session.session_id and qr.exercise_id > 0:
             self.db.record_answer(
