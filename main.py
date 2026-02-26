@@ -308,7 +308,7 @@ class MainWindow(QMainWindow):
     def _connect_engine_callbacks(self):
         """Leagă callbacks-urile engine-ului la UI."""
         self.engine.on_state_change = self._on_state_change
-        self.engine.on_show_text = self._on_show_text
+        # self.engine.on_show_text = self._on_show_text   # dezactivat: subtitlu ascuns temporar
         self.engine.on_show_exercise = self._on_show_exercise
         self.engine.on_show_hint = self._on_show_hint
         self.engine.on_exercise_result = self._on_exercise_result

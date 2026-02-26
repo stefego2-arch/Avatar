@@ -785,7 +785,8 @@ class DashboardScreen(QWidget):
             dy=0.05, size=11, color="#666666")
 
         # Linie separator
-        ax.axhline(y=y + 0.01, color="#3498db", linewidth=1.5, transform=ax.transAxes)
+        ax.plot([0, 1], [y + 0.01, y + 0.01], transform=ax.transAxes,
+                color="#3498db", linewidth=1.5, clip_on=False)
         y -= 0.02
 
         txt("REZUMAT GENERAL", dy=0.04, size=13, weight="bold", color="#2c3e50")
@@ -811,7 +812,8 @@ class DashboardScreen(QWidget):
             txt("  Nicio lecție cu scor sub 70%. Excelent! 🎉", size=11)
 
         y -= 0.02
-        ax.axhline(y=y + 0.01, color="#d0d8e4", linewidth=0.8, transform=ax.transAxes)
+        ax.plot([0, 1], [y + 0.01, y + 0.01], transform=ax.transAxes,
+                color="#d0d8e4", linewidth=0.8, clip_on=False)
         y -= 0.02
         txt("Avatar Tutor — Raport generat automat",
             dy=0.03, size=9, color="#aaaaaa")
