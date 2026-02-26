@@ -81,7 +81,7 @@ class AvatarSchemeHandler(QWebEngineUrlSchemeHandler):
             job.fail(QWebEngineUrlRequestJob.Error.RequestFailed)
             return
 
-        buf = QBuffer()
+        buf = QBuffer(job)   # job ca parent Qt — previne GC înainte ca Chromium să termine citirea
         buf.open(QIODevice.OpenModeFlag.ReadWrite)
         buf.write(data)
         buf.seek(0)
