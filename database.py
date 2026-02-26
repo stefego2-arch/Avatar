@@ -251,10 +251,26 @@ class Database:
         if row:
             return dict(row)
 
-        # 2) Toate lecțiile sunt trecute → returnăm None.
-        # login_screen.py va lua lessons[0] și va reîncepe de la prima (review mode).
-        # NU mai returnăm ultima lecție ca fallback — cauza repetiției la infinit.
-        return None
+        # 2) Toate lecțiile sunt trecute → review mode.
+        # Returnăm lecția cu cel mai vechi last_attempt (cea mai puțin recent studiată).
+        # Astfel: lecție 20 terminată → last_attempt actualizat → data viitoare vine 21,
+        # lecție 21 terminată → last_attempt actualizat → data viitoare vine 20, etc.
+        # Rotație naturală în loc de aceeași lecție la infinit.
+        cur.execute(
+            """
+            SELECT l.*
+            FROM lessons l
+            LEFT JOIN progress p
+              ON p.lesson_id = l.id AND p.user_id = ?
+            WHERE l.grade = ? AND l.subject = ?
+            ORDER BY COALESCE(p.last_attempt, '0000-00-00') ASC,
+                     l.unit ASC, l.order_in_unit ASC, l.id ASC
+            LIMIT 1
+            """,
+            (user_id, grade, subject_norm),
+        )
+        row = cur.fetchone()
+        return dict(row) if row else None
 
     @property
     def conn(self):
