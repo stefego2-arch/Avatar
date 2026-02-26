@@ -423,12 +423,18 @@ class CommandListener(QThread):
             print("CommandListener: sounddevice lipsește")
             return
 
+        # Mic delay: lasă MediaPipe XNNPACK să termine frame-ul curent
+        # înainte de a inițializa ctranslate2 (previne conflict OpenMP)
+        import time as _time; _time.sleep(3)
+
         # Încărcăm modelul "tiny" (~39 MB, rapid)
-        # "auto" = ctranslate2 alege tipul optim pentru CPU (nu face abort pe AVX2 lips)
         try:
             from faster_whisper import WhisperModel
-            self._model = WhisperModel("tiny", device="cpu", compute_type="auto")
-            print("🎙️ CommandListener: model 'tiny' încărcat (auto)")
+            self._model = WhisperModel(
+                "tiny", device="cpu", compute_type="int8",
+                cpu_threads=1,   # evită conflictul OpenMP cu MediaPipe XNNPACK
+            )
+            print("🎙️ CommandListener: model 'tiny' încărcat (int8)")
         except Exception as e:
             print(f"CommandListener: nu pot încărca modelul — {e}")
             return
