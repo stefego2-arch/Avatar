@@ -128,6 +128,7 @@ class VoiceInputWorker(QThread):
                 self._model_size,
                 device="cpu",
                 compute_type="int8",
+                cpu_threads=1,   # evită conflictul OpenMP cu MediaPipe XNNPACK
             )
             return True
         except ImportError:

@@ -1,5 +1,10 @@
 import sys
 import os
+# Previne conflictele OpenMP/MKL/BLAS între ctranslate2 (Whisper) și MediaPipe (XNNPACK).
+# Trebuie setat ÎNAINTE de orice import nativ.
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
 import io
 import json
 import time
@@ -371,10 +376,15 @@ class MainWindow(QMainWindow):
         import threading
 
         def _load():
+            # Delay: lasă MediaPipe/XNNPACK să se inițializeze complet înainte de ctranslate2
+            time.sleep(20)
             try:
                 from faster_whisper import WhisperModel
                 print("[whisper-prewarm] Se încarcă modelul 'base'...")
-                _model = WhisperModel("base", device="cpu", compute_type="int8")
+                _model = WhisperModel(
+                    "base", device="cpu", compute_type="int8",
+                    cpu_threads=1,   # evită conflictul OpenMP cu MediaPipe
+                )
                 print("[whisper-prewarm] ✅ Model încărcat — gata pentru voce")
             except Exception as e:
                 print(f"[whisper-prewarm] ⚠️  Nu s-a putut preîncărca: {e}")
