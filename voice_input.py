@@ -42,6 +42,12 @@ SILENCE_THRESH = 0.008    # prag amplitudine pentru detectie silenta
 SILENCE_SECS   = 1.2      # secunde de silenta dupa care se opreste automat
 DEFAULT_MODEL  = "base"   # tiny / base / small / medium
 
+# ctranslate2 (faster-whisper) nu funcționează in același proces cu Qt WebEngine
+# (Chromium ProcessDynamicCodePolicy blochează kernelele SIMD ale ctranslate2).
+# Solutia permanentă: subprocess isolation (whisper_proc.py — TODO sprint următor).
+# Pana atunci: WHISPER_DISABLED=True previne crash-ul; MicButton arata mesaj clar.
+WHISPER_DISABLED: bool = True
+
 
 # ── Helper: selectie device input sigur (evita HAP/AMD abort() C++) ──────────
 
@@ -120,6 +126,14 @@ class VoiceInputWorker(QThread):
     def _load_model(self):
         if self._model is not None:
             return True
+        if WHISPER_DISABLED:
+            self.error_occurred.emit(
+                "Voce input dezactivat temporar.\n\n"
+                "ctranslate2 (Whisper) nu este compatibil cu Qt WebEngine\n"
+                "în această configurație (Python 3.14 + Chromium sandbox).\n\n"
+                "Scrie răspunsul manual în câmpul de text."
+            )
+            return False
         try:
             from faster_whisper import WhisperModel
             self.status_changed.emit("Se incarca modelul vocal...")
@@ -423,8 +437,11 @@ class CommandListener(QThread):
             print("CommandListener: sounddevice lipsește")
             return
 
+        if WHISPER_DISABLED:
+            print("CommandListener: voce dezactivata (WHISPER_DISABLED=True)")
+            return
+
         # Mic delay: lasă MediaPipe XNNPACK să termine frame-ul curent
-        # înainte de a inițializa ctranslate2 (previne conflict OpenMP)
         import time as _time; _time.sleep(3)
 
         # Încărcăm modelul "tiny" (~39 MB, rapid)
@@ -434,7 +451,7 @@ class CommandListener(QThread):
                 "tiny", device="cpu", compute_type="int8",
                 cpu_threads=1,   # evită conflictul OpenMP cu MediaPipe XNNPACK
             )
-            print("🎙️ CommandListener: model 'tiny' încărcat (int8)")
+            print("CommandListener: model 'tiny' incarcat (int8)")
         except Exception as e:
             print(f"CommandListener: nu pot încărca modelul — {e}")
             return

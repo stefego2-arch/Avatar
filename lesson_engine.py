@@ -26,7 +26,7 @@ from typing import Optional, Callable, Any
 from database import Database
 from deepseek_client import DeepSeekClient
 from tts_engine import TTSEngine, get_message
-from md_library import classify_chunk
+from md_library import classify_chunk, sanitize_markdown_for_tts
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -398,11 +398,14 @@ class LessonEngine:
             self.on_state_change(state)
 
     def _speak(self, text: str, emotion: str = "idle"):
+        # Elimină markdown (**, ##, `, ---) înainte de TTS — altfel ElevenLabs
+        # citeste literal "asterisc asterisc" sau "diez diez".
+        clean = sanitize_markdown_for_tts(text, keep_headings=False)
         if self.on_avatar_message:
-            self.on_avatar_message(text, emotion)
-        self.tts.speak(text)
+            self.on_avatar_message(clean, emotion)
+        self.tts.speak(clean)
         if self.on_show_text:
-            self.on_show_text(text)
+            self.on_show_text(clean)
 
     def _show_current_exercise(self):
         exercises = self._get_current_exercises()
