@@ -1,7 +1,14 @@
 import sys
 import os
-# Previne conflictele OpenMP/MKL/BLAS între ctranslate2 (Whisper) și MediaPipe (XNNPACK).
-# Trebuie setat ÎNAINTE de orice import nativ.
+# ── Compatibilitate ctranslate2 (Whisper) + Qt WebEngine pe Windows ──────────
+# Chromium (Qt WebEngine) aplică ProcessDynamicCodePolicy care blochează
+# kernelele SIMD dinamice ale ctranslate2. Dezactivăm politica înainte de
+# orice import Qt.
+os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS",
+    "--disable-features=RendererCodeIntegrity "
+    "--disable-dev-shm-usage"
+)
+# Previne conflictele OpenMP/MKL/BLAS între ctranslate2 și MediaPipe XNNPACK.
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 os.environ.setdefault("MKL_NUM_THREADS", "1")
@@ -198,8 +205,9 @@ class MainWindow(QMainWindow):
         self._cmd_listener = CommandListener()
         self._cmd_listener.command_detected.connect(self._on_voice_command)
 
-        # Pre-warm Whisper model în background (evită lag + HuggingFace request la primul click)
-        self._prewarm_whisper()
+        # Prewarm dezactivat: ctranslate2 conflicteaza cu Qt WebEngine (ProcessDynamicCodePolicy).
+        # WhisperModel se incarca lazy la primul click pe butonul de microfon.
+        # self._prewarm_whisper()
 
         # Stare sesiune curentă
         self._current_user = None
@@ -464,8 +472,10 @@ class MainWindow(QMainWindow):
             # Afișează ecranul de lecție
             self._stack.setCurrentIndex(1)
 
-            # Activează barge-in vocal (HAP driver bug rezolvat cu _find_safe_input_device)
-            self._cmd_listener.start_listening()
+            # CommandListener (barge-in vocal) dezactivat temporar:
+            # ctranslate2 + Qt WebEngine ProcessDynamicCodePolicy = crash.
+            # Se reactiveaza dupa rezolvarea conflictului ctranslate2/Chromium.
+            # self._cmd_listener.start_listening()
 
             # Pornește engine (cu teorie din DB)
             self.engine.start(user_id=user["id"], lesson_id=lesson_id)
