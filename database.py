@@ -251,19 +251,10 @@ class Database:
         if row:
             return dict(row)
 
-        # 2) fallback: dacă toate sunt passed=1, întoarce ultima (sau prima) ca "review"
-        cur.execute(
-            """
-            SELECT l.*
-            FROM lessons l
-            WHERE l.grade = ? AND l.subject = ?
-            ORDER BY l.unit DESC, l.order_in_unit DESC, l.id DESC
-            LIMIT 1
-            """,
-            (grade, subject_norm),
-        )
-        row = cur.fetchone()
-        return dict(row) if row else None
+        # 2) Toate lecțiile sunt trecute → returnăm None.
+        # login_screen.py va lua lessons[0] și va reîncepe de la prima (review mode).
+        # NU mai returnăm ultima lecție ca fallback — cauza repetiției la infinit.
+        return None
 
     @property
     def conn(self):
