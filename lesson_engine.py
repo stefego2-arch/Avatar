@@ -573,8 +573,10 @@ class LessonEngine:
                 self._emit_emotion("excited", 0.85)
                 if self.on_streak_milestone:
                     self.on_streak_milestone(streak)
+            elif streak >= 3:
+                self._emit_emotion("happy", 0.9)
             else:
-                self._emit_emotion("happy", min(0.6 + streak * 0.05, 0.9))
+                self._emit_emotion("happy", 0.6)
         else:
             self.session.correct_streak = 0
             self.session.consecutive_wrong += 1
@@ -584,18 +586,17 @@ class LessonEngine:
             feedback = fb or ex.get("explicatie") or get_message("try_again")
             # ── Emoție bazată pe greșeli consecutive ────────────────────
             wrong = self.session.consecutive_wrong
-            if wrong >= 3:
-                self._emit_emotion("thinking", 0.6)
-            elif wrong >= 2:
-                self._emit_emotion("sad", 0.6)
+            if wrong >= 2:
+                self._emit_emotion("encouraging", 0.8)
             else:
-                self._emit_emotion("sad", 0.4)
+                self._emit_emotion("sad", 0.5)
 
         # DDA: tier upgrade la 3 răspunsuri corecte consecutive
         if self.session.tier_up_streak >= 3 and self.session.current_tier < 3:
             self.session.current_tier = min(3, self.session.current_tier + 1)
             self.session.tier_up_streak = 0
             tier_msg = f"Fantastic! Trecem la nivelul {self.session.current_tier} — exerciții mai dificile!"
+            self._emit_emotion("excited", 1.0)
             if self.on_avatar_message:
                 self.on_avatar_message(tier_msg, "happy")
 
@@ -604,6 +605,7 @@ class LessonEngine:
             self.session.current_tier = max(1, self.session.current_tier - 1)
             self.session.tier_down_count = 0
             tier_msg = f"Hai să consolidăm nivelul {self.session.current_tier} — ne pregătim mai bine!"
+            self._emit_emotion("thinking", 0.6)
             if self.on_avatar_message:
                 self.on_avatar_message(tier_msg, "neutral")
 
@@ -759,6 +761,7 @@ class LessonEngine:
             f"Timp mediu/răspuns: {self.session.avg_answer_time:.1f}s, Editări medii: {self.session.avg_edits:.1f}.\n"
         )
         summary += "Felicitări! Ai trecut lectia!" if passed else "Bun efort! Mai exersam putin si data viitoare va fi mai usor!"
+        self._emit_emotion("excited" if passed else "encouraging", 1.0 if passed else 0.7)
         self._speak(summary, "happy" if passed else "encouraging")
 
         self._transition_to(LessonState.DONE)
