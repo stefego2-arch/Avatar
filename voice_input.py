@@ -253,6 +253,16 @@ class MicButton(QObject):
         self._worker: Optional[VoiceInputWorker] = None
         self._model_size = model_size
 
+        if WHISPER_DISABLED:
+            button.setEnabled(False)
+            button.setToolTip("Voce dezactivată temporar — scrie răspunsul manual")
+            button.setStyleSheet(
+                "QPushButton { background-color: #95a5a6; color: white; "
+                "border-radius: 10px; padding: 8px 14px; font-weight: bold; "
+                "font-size: 14px; }"
+            )
+            return
+
         # Stilizare initiala
         self._update_btn_style("idle")
         button.setCheckable(True)
