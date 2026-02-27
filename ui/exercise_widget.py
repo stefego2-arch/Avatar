@@ -104,7 +104,7 @@ class ExerciseWidget(QWidget):
         self._lbl_enunt.setFont(QFont("Arial", 26, QFont.Weight.Bold))
         self._lbl_enunt.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._lbl_enunt.setWordWrap(True)
-        self._lbl_enunt.setMinimumHeight(120)
+        self._lbl_enunt.setMinimumHeight(60)
         self._lbl_enunt.setStyleSheet(
             "background-color: #fafbfc; border-radius: 10px; padding: 20px;"
         )
@@ -118,7 +118,7 @@ class ExerciseWidget(QWidget):
         for _ in range(4):
             btn = QPushButton()
             btn.setFont(QFont("Arial", 14, QFont.Weight.Bold))
-            btn.setMinimumHeight(55)
+            btn.setMinimumHeight(44)
             btn.setStyleSheet(BTN_PRIMARY)
             btn.clicked.connect(lambda checked, b=btn: self._submit_choice(b.text()))
             choices_layout.addWidget(btn)
@@ -167,8 +167,8 @@ class ExerciseWidget(QWidget):
             "Exemplu:\n  Necunoscuta: x = ?\n  x + 5 = 12 → x = 12 - 5 = 7"
         )
         self._scratch_pad.setFont(QFont("Arial", 13))
-        self._scratch_pad.setMinimumHeight(200)
-        self._scratch_pad.setMaximumHeight(350)
+        self._scratch_pad.setMinimumHeight(80)
+        self._scratch_pad.setMaximumHeight(300)
         self._scratch_pad.setStyleSheet(
             "QTextEdit { background-color: #fffef0; border: 1px solid #c8b96e; "
             "border-radius: 8px; padding: 8px; }"
@@ -187,7 +187,7 @@ class ExerciseWidget(QWidget):
         self._answer_input.setPlaceholderText("Scrie răspunsul final...")
         self._answer_input.setFont(QFont("Arial", 22))
         self._answer_input.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._answer_input.setMinimumHeight(60)
+        self._answer_input.setMinimumHeight(44)
         self._answer_input.returnPressed.connect(self._submit_text)
         self._edit_count = 0
         self._answer_input.textEdited.connect(self._on_text_edited)
@@ -200,7 +200,7 @@ class ExerciseWidget(QWidget):
         btn_layout.setSpacing(10)
 
         self._btn_hint = QPushButton("💡 Hint")
-        self._btn_hint.setMinimumHeight(50)
+        self._btn_hint.setMinimumHeight(40)
         self._btn_hint.setFont(QFont("Arial", 13))
         self._btn_hint.setStyleSheet(BTN_WARNING)
         self._btn_hint.clicked.connect(self.hint_requested.emit)
@@ -208,7 +208,7 @@ class ExerciseWidget(QWidget):
 
         # Buton microfon (stilizat de MicButton dupa initializare)
         self._btn_mic = QPushButton("🎤 Vorbeste")
-        self._btn_mic.setMinimumHeight(50)
+        self._btn_mic.setMinimumHeight(40)
         self._btn_mic.setFont(QFont("Arial", 13, QFont.Weight.Bold))
         self._btn_mic.setStyleSheet(
             "QPushButton { background-color: #27ae60; color: white; "
@@ -217,7 +217,7 @@ class ExerciseWidget(QWidget):
         btn_layout.addWidget(self._btn_mic)
 
         self._btn_submit = QPushButton("✅ Verifică")
-        self._btn_submit.setMinimumHeight(50)
+        self._btn_submit.setMinimumHeight(40)
         self._btn_submit.setFont(QFont("Arial", 14, QFont.Weight.Bold))
         self._btn_submit.setStyleSheet(BTN_SUCCESS)
         self._btn_submit.clicked.connect(self._submit_text)
@@ -227,7 +227,7 @@ class ExerciseWidget(QWidget):
 
         # Feedback
         self._feedback_frame = QFrame()
-        self._feedback_frame.setMinimumHeight(70)
+        self._feedback_frame.setMinimumHeight(50)
         self._feedback_frame.setStyleSheet(
             "background-color: #f0f4f8; border-radius: 10px; padding: 10px;"
         )

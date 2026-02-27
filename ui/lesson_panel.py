@@ -7,10 +7,28 @@ from __future__ import annotations
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
+from PyQt6.QtCore import QSize
 from PyQt6.QtWidgets import (
     QHBoxLayout, QLabel, QLineEdit, QPushButton,
     QStackedWidget, QTextEdit, QVBoxLayout, QWidget,
 )
+
+
+class _AdaptiveStack(QStackedWidget):
+    """QStackedWidget care raportează sizeHint-ul paginii curente (nu max-ul tuturor).
+    Rezolvă problema mintrack 1409px pe ecrane mici (14 inch, 1094px înălțime).
+    """
+    def minimumSizeHint(self) -> QSize:
+        w = self.currentWidget()
+        if w:
+            return w.minimumSizeHint()
+        return super().minimumSizeHint()
+
+    def sizeHint(self) -> QSize:
+        w = self.currentWidget()
+        if w:
+            return w.sizeHint()
+        return super().sizeHint()
 
 from lesson_engine import QuestionResult
 from ui.exercise_widget import ExerciseWidget
@@ -56,8 +74,8 @@ class LessonPanel(QWidget):
 
         layout.addLayout(header)
 
-        # Stack cu conținut
-        self._stack = QStackedWidget()
+        # Stack cu conținut — _AdaptiveStack raportează min-size-ul paginii curente
+        self._stack = _AdaptiveStack()
 
         # ── Page 0: Text lecție ──
         self._page_text = QWidget()

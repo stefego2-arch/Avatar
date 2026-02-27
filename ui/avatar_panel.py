@@ -56,7 +56,7 @@ class AvatarPanel(QWidget):
         # ── Avatar 3D (WebEngine → viewer.html) ───────────────────────────
         self.avatar_view = QWebEngineView()
         self.avatar_view.setPage(_DebugPage(self.avatar_view))
-        self.avatar_view.setFixedHeight(320)
+        self.avatar_view.setFixedHeight(260)
 
         # AICI este cheia: folosim schema avatar:// configurată în main.py
         self.avatar_view.setUrl(QUrl("avatar://localhost/viewer.html"))
@@ -132,7 +132,7 @@ class AvatarPanel(QWidget):
         self._lbl_message.setFont(QFont("Arial", 11))
         self._lbl_message.setWordWrap(True)
         self._lbl_message.setAlignment(Qt.AlignmentFlag.AlignTop)
-        self._lbl_message.setMinimumHeight(80)
+        self._lbl_message.setMinimumHeight(55)
         self._lbl_message.setStyleSheet("padding: 5px; color: #2c3e50;")
         msg_layout.addWidget(self._lbl_message)
         msg_box.setLayout(msg_layout)

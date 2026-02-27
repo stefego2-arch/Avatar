@@ -38,7 +38,7 @@ from PyQt6.QtWebEngineCore import QWebEngineUrlScheme as _QWebEngineUrlScheme
 _sch = _QWebEngineUrlScheme(b"avatar")
 _sch.setFlags(
     _QWebEngineUrlScheme.Flag.SecureScheme |
-    _QWebEngineUrlScheme.Flag.LocalScheme  |
+    _QWebEngineUrlScheme.Flag.CorsEnabled  |   # CDN access: removes file:// restriction
     _QWebEngineUrlScheme.Flag.LocalAccessAllowed
 )
 _QWebEngineUrlScheme.registerScheme(_sch)
@@ -124,7 +124,7 @@ from ui.avatar_widget   import AvatarWidget
 from ui.login_screen    import LoginScreen
 from ui.exercise_widget import ExerciseWidget
 from ui.avatar_panel    import AvatarPanel
-from ui.lesson_panel    import LessonPanel
+from ui.lesson_panel    import LessonPanel, _AdaptiveStack
 
 
 # ─── Stiluri globale ─────────────────────────────────────────────────────────
@@ -222,7 +222,8 @@ class MainWindow(QMainWindow):
         self._is_paused = False
 
         # ── UI ────────────────────────────────────────────────────────────
-        self._stack = QStackedWidget()
+        # _AdaptiveStack: raportează min-size-ul paginii curente, nu max-ul tuturor
+        self._stack = _AdaptiveStack()
         self.setCentralWidget(self._stack)
 
         # Ecran login
