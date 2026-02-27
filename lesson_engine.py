@@ -112,7 +112,13 @@ class LessonSession:
         return self.get_score(self.practice_results)
 
     def get_posttest_score(self) -> float:
-        return self.get_score(self.posttest_results)
+        if self.posttest_results:
+            return self.get_score(self.posttest_results)
+        # Fallback: dacă posttest a fost sărit (nu există exerciții), folosim practica
+        # Evită afișarea 0% când elevul a răspuns corect la exercițiile de practică.
+        if self.practice_results:
+            return self.get_score(self.practice_results)
+        return 0.0
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -132,7 +138,7 @@ class MisconceptionEngine:
         enunt_s = (enunt or "").strip().lower()
 
         if not user_s:
-            return "Nu am primit un răspuns. Încearcă să scrii sau să spui un număr/cuvânt." 
+            return "Nu am primit un răspuns. Încearcă să scrii sau să spui un număr/cuvânt."
 
         # Matematică
         if "mat" in subject:
@@ -201,16 +207,11 @@ class LessonEngine:
         self.on_phase_complete:  Optional[Callable[[str, float], None]] = None
         self.on_done:            Optional[Callable[[LessonSession], None]] = None
         self.on_avatar_message:  Optional[Callable[[str, str], None]] = None  # text, emotion
-        self.on_emotion_change:  Optional[Callable[[str, float], None]] = None  # emotion, intensity
-        self.on_streak_milestone: Optional[Callable[[int], None]] = None  # streak count
+        self.on_emotion_change:   Optional[Callable[[str, float], None]] = None  # (emotion, intensity)
+        self.on_streak_milestone: Optional[Callable[[int], None]] = None         # streak 3/5/10
 
-    def _emit_emotion(self, emotion: str, intensity: float = 0.7):
-        """Emite o emoție către avatar (happy/sad/excited/thinking) cu intensitate 0–1."""
-        if self.on_emotion_change:
-            try:
-                self.on_emotion_change(emotion, intensity)
-            except Exception:
-                pass
+        # Control flux buton "Continuă →" din UI
+        self._waiting_for_continue: bool = False
 
     # ───────────────────────────────────────────────────────────────────
     # Public control
@@ -236,8 +237,7 @@ class LessonEngine:
         self.session.session_id = self.db.start_session(user_id, lesson_id, "full")
 
         # SRS Jocul de Încălzire — exerciții scadente din sesiuni anterioare
-        srs_due = self.db.get_srs_due(user_id, limit=3,
-                                      subject=lesson.get("subject"))
+        srs_due = self.db.get_srs_due(user_id, limit=3)
         if srs_due:
             self.session.warmup_exercises = srs_due
             self.session.srs_exercise_ids = {ex["id"] for ex in srs_due}
@@ -395,12 +395,39 @@ class LessonEngine:
         self._transition_to(LessonState.POST_TEST)
         self.session.current_exercise_idx = 0
         self.session.current_hints_used = 0
+
+        # ── FIX: lecții importate din manual nu au exerciții posttest separate ──
+        # generate_from_manuals.py pune tot în faza "practice". Dacă posttest e gol,
+        # selectăm ultimele N exerciții practice (cele mai grele) ca "test final".
+        if not self.session.posttest_exercises and self.session.practice_exercises:
+            n = self.POSTTEST_COUNT
+            # Sortăm descrescător după dificultate — test final = exerciții mai grele
+            candidates = sorted(
+                self.session.practice_exercises,
+                key=lambda e: int(e.get("difficulty_tier") or e.get("dificultate") or 1),
+                reverse=True,
+            )
+            self.session.posttest_exercises = candidates[:n]
+            print(
+                f"ℹ️  Posttest gol — folosim {len(self.session.posttest_exercises)} "
+                f"exerciții practice (cele mai grele) ca test final"
+            )
+
+        self._emit_emotion("thinking", 0.6)
         self._speak("Gata! Facem un test scurt de final.", "talking")
         self._show_current_exercise()
 
     # ───────────────────────────────────────────────────────────────────
     # UI helpers
     # ───────────────────────────────────────────────────────────────────
+
+    def _emit_emotion(self, emotion: str, intensity: float = 0.5):
+        """Emite emoția curentă a avatarului (thread-safe via callback)."""
+        try:
+            if self.on_emotion_change:
+                self.on_emotion_change(emotion, intensity)
+        except Exception:
+            pass
 
     def _transition_to(self, state: LessonState):
         if not self.session:
@@ -410,11 +437,10 @@ class LessonEngine:
             self.on_state_change(state)
 
     def _speak(self, text: str, emotion: str = "idle"):
-        # Elimină markdown (**, ##, `, ---) înainte de TTS — altfel ElevenLabs
-        # citeste literal "asterisc asterisc" sau "diez diez".
         clean = sanitize_markdown_for_tts(text, keep_headings=False)
         if self.on_avatar_message:
             self.on_avatar_message(clean, emotion)
+        self._emit_emotion(emotion, 0.5)
         self.tts.speak(clean)
         if self.on_show_text:
             self.on_show_text(clean)
@@ -563,18 +589,16 @@ class LessonEngine:
             self.session.tier_up_streak += 1
             self.session.tier_down_count = 0
             feedback = get_message("encourage")
-            # ── Emoție bazată pe streak ─────────────────────────────────
             streak = self.session.correct_streak
             if streak >= 10:
                 self._emit_emotion("excited", 1.0)
-                if self.on_streak_milestone:
-                    self.on_streak_milestone(streak)
+                if self.on_streak_milestone: self.on_streak_milestone(streak)
             elif streak >= 5:
                 self._emit_emotion("excited", 0.85)
-                if self.on_streak_milestone:
-                    self.on_streak_milestone(streak)
+                if self.on_streak_milestone: self.on_streak_milestone(streak)
             elif streak >= 3:
                 self._emit_emotion("happy", 0.9)
+                if self.on_streak_milestone: self.on_streak_milestone(streak)
             else:
                 self._emit_emotion("happy", 0.6)
         else:
@@ -584,9 +608,7 @@ class LessonEngine:
             self.session.tier_down_count += 1
             fb = self._mis.feedback(self.session.lesson.get("subject", ""), ex.get("enunt", ""), correct, user)
             feedback = fb or ex.get("explicatie") or get_message("try_again")
-            # ── Emoție bazată pe greșeli consecutive ────────────────────
-            wrong = self.session.consecutive_wrong
-            if wrong >= 2:
+            if self.session.consecutive_wrong >= 2:
                 self._emit_emotion("encouraging", 0.8)
             else:
                 self._emit_emotion("sad", 0.5)
@@ -596,18 +618,18 @@ class LessonEngine:
             self.session.current_tier = min(3, self.session.current_tier + 1)
             self.session.tier_up_streak = 0
             tier_msg = f"Fantastic! Trecem la nivelul {self.session.current_tier} — exerciții mai dificile!"
-            self._emit_emotion("excited", 1.0)
             if self.on_avatar_message:
                 self.on_avatar_message(tier_msg, "happy")
+            self._emit_emotion("excited", 1.0)
 
         # DDA: tier downgrade la 2 greșeli consecutive
         elif self.session.tier_down_count >= 2 and self.session.current_tier > 1:
             self.session.current_tier = max(1, self.session.current_tier - 1)
             self.session.tier_down_count = 0
             tier_msg = f"Hai să consolidăm nivelul {self.session.current_tier} — ne pregătim mai bine!"
-            self._emit_emotion("thinking", 0.6)
             if self.on_avatar_message:
                 self.on_avatar_message(tier_msg, "neutral")
+            self._emit_emotion("thinking", 0.6)
 
         qr = QuestionResult(
             exercise_id=int(ex.get("id", 0)),
@@ -688,9 +710,20 @@ class LessonEngine:
             self._trigger_alt_explanation()
             return
 
-        # next
+        # next — UI va apela advance_after_result() prin butonul "Continuă →"
         self.session.current_hints_used = 0
         self.session.current_exercise_idx += 1
+        self._waiting_for_continue = True
+
+    def advance_after_result(self):
+        """Apelat de UI (butonul 'Continuă →') după ce copilul citește feedback-ul.
+
+        Separă momentul afișării feedback-ului de tranziția la exercițiul următor:
+        copilul citește explicația și apasă conștient în loc de auto-advance instant.
+        """
+        if not self.session or not self._waiting_for_continue:
+            return
+        self._waiting_for_continue = False
         self._show_current_exercise()
 
     # ───────────────────────────────────────────────────────────────────
@@ -865,10 +898,17 @@ class LessonEngine:
         except Exception as e:
             print(f"⚠️  Error bank fetch: {e}")
 
-        # Dacă exercițiile din DB sunt placeholder, generează unele reale cu AI
+        # Generare AI — NUMAI dacă lecția chiar are nevoie (nu are exerciții reale)
         if self.deepseek.available:
-            t = threading.Thread(target=self._generate_exercises_background, daemon=True)
-            t.start()
+            lesson_id_bg = self.session.lesson.get("id", 0) if self.session else 0
+            has_real = self._has_real_exercises(lesson_id_bg)
+            if has_real:
+                print(f"⏭️  AI skip: '{self.session.lesson.get('title','')}' are deja exerciții reale")
+            else:
+                # Delay 12s — lasă UI și modelul să se stabilizeze înainte de Ollama
+                t = threading.Timer(12.0, self._generate_exercises_background)
+                t.daemon = True
+                t.start()
 
     def _trigger_alt_explanation(self):
         """Afișează un chunk alternativ de teorie după 3 greșeli consecutive.
@@ -918,6 +958,28 @@ class LessonEngine:
         "da",  # single-word fallback answers
     )
 
+    def _has_real_exercises(self, lesson_id: int) -> bool:
+        """True dacă lecția are deja suficiente exerciții reale (non-placeholder).
+
+        Verificare SQLite <1ms. Previne supraîncălzirea CPU la lecții din manuale
+        care au deja 10-30 exerciții practice importate.
+        """
+        if not lesson_id:
+            return False
+        try:
+            count = self.db.conn.execute(
+                """SELECT COUNT(*) FROM exercises
+                   WHERE lesson_id = ? AND phase = 'practice'
+                     AND length(enunt) >= 30
+                     AND enunt NOT LIKE 'Intrebare rapida%'
+                     AND enunt NOT LIKE 'Exercitiu de practica%'""",
+                (lesson_id,),
+            ).fetchone()[0]
+            # Dacă are cel puțin 3 exerciții practice reale, nu mai generăm
+            return count >= 3
+        except Exception:
+            return False  # Eroare → lasă AI să decidă
+
     def _is_placeholder_exercise(self, ex: dict) -> bool:
         """True if exercise was auto-generated as a placeholder (not real content)."""
         enunt = ex.get("enunt", "")
@@ -965,17 +1027,18 @@ class LessonEngine:
             if not generated:
                 continue
 
-            # Remove placeholder exercises for this lesson+phase
-            self.db.conn.execute(
-                """DELETE FROM exercises
-                   WHERE lesson_id=? AND phase=?
-                     AND (length(enunt) < 20
-                          OR enunt LIKE 'Intrebare rapida%'
-                          OR enunt LIKE 'Exercitiu de practica%'
-                          OR enunt LIKE 'Test final%')""",
-                (lesson_id, phase),
-            )
-            self.db.conn.commit()
+            # Remove placeholder exercises (cu write_lock pentru thread-safety)
+            with self.db.write_lock:
+                self.db.conn.execute(
+                    """DELETE FROM exercises
+                       WHERE lesson_id=? AND phase=?
+                         AND (length(enunt) < 20
+                              OR enunt LIKE 'Intrebare rapida%'
+                              OR enunt LIKE 'Exercitiu de practica%'
+                              OR enunt LIKE 'Test final%')""",
+                    (lesson_id, phase),
+                )
+                self.db.conn.commit()
 
             # Insert generated exercises
             added = 0
@@ -1008,4 +1071,3 @@ class LessonEngine:
             # Also regenerate pretest if needed but skip if lesson has already advanced
             if phase == "pretest" and session.state == LessonState.PRE_TEST:
                 session.current_exercise_idx = 0
-

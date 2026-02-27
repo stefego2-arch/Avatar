@@ -1,146 +1,157 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ro">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Avatar Viewer</title>
+  <meta charset="UTF-8">
+  <title>Avatar</title>
   <style>
-    html, body { margin: 0; padding: 0; overflow: hidden; background: #0f1115; }
-    #c { width: 100vw; height: 100vh; display: block; }
+    *{margin:0;padding:0;box-sizing:border-box}
+    html,body{width:100%;height:100%;overflow:hidden;background:transparent}
+    canvas{display:block;width:100%!important;height:100%!important}
+    #fb{display:none;position:absolute;inset:0;justify-content:center;align-items:center;
+        font-size:80px;font-family:"Segoe UI Emoji","Apple Color Emoji",sans-serif;
+        background:radial-gradient(ellipse at 50% 35%,#eaf6ff,#cde6f7)}
   </style>
-  
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
-      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
-    }
-  }
-  </script>
 </head>
 <body>
   <canvas id="c"></canvas>
+  <div id="fb">🤖</div>
+
+  <!-- Importmap local: rezolvă bare specifier 'three' folosit intern de GLTFLoader.js -->
+  <!-- GLTFLoader.js (linia 67) face: import { ... } from 'three'               -->
+  <!-- Fără importmap → TypeError "Failed to resolve module specifier 'three'"  -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./three/three.module.js"
+    }
+  }
+  </script>
 
   <script type="module">
-    import * as THREE from 'three';
-    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    // Importuri directe locale — fara CDN, fara ciclu three.core.min.js
+    import * as THREE from './three/three.module.js';
+    import { GLTFLoader } from './three/GLTFLoader.js';
 
-    const canvas = document.getElementById("c");
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-    renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.setClearColor(0x0d1117, 1);
+    const canvas = document.getElementById('c');
+    let mixer=null, clock=null;
+    let mouthMesh=null, mouthMorphIdx=-1;
+    let animActions={}, currentAction=null;
+    let pendingMouth=0;
+
+    // Renderer
+    const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true, powerPreference:'low-power'});
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    if(THREE.SRGBColorSpace) renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(25, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 1.80, 1.1);
-    camera.lookAt(0, 1.65, 0);
+    scene.background = null;
 
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 2.0));
-    const light = new THREE.DirectionalLight(0xffffff, 1.5);
-    light.position.set(2, 2, 2);
-    scene.add(light);
+    const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
+    camera.position.set(0, 1.35, 3.2);
+    camera.lookAt(0, 1.1, 0);
 
-    const avatarGroup = new THREE.Group();
-    scene.add(avatarGroup);
+    scene.add(new THREE.AmbientLight(0xfff8f0, 1.3));
+    const kl = new THREE.DirectionalLight(0xfff0d8, 1.8);
+    kl.position.set(1.5,3,2.5); scene.add(kl);
+    const fl = new THREE.DirectionalLight(0xd8eeff, 0.7);
+    fl.position.set(-1.5,1,2); scene.add(fl);
 
-    let mixer, idleAction, talkAction, isTalking = false;
-    const clock = new THREE.Clock();
+    clock = new THREE.Clock();
+    resize();
 
-    // Lip-sync state
-    let jawMesh   = null;   // mesh-ul cu morphTarget jawOpen (dacă există)
-    let jawIndex  = -1;     // indexul în morphTargetInfluences
-    let _mouthTarget  = 0.0;  // valoarea trimisă din Python
-    let _mouthCurrent = 0.0;  // valoarea curentă (lerp spre target)
-
-    const loader = new GLTFLoader();
-    // Încărcăm modelul tău local
-    loader.load("./model5.glb", (gltf) => {
+    new GLTFLoader().load('./model5.glb', gltf=>{
       const model = gltf.scene;
-      // Model era deja cu fata spre camera (rotation.y = 0)
-      // Math.PI il intorcea cu spatele — lasam 0
-      model.rotation.y = +0.7;   // corecție ușoară spre stânga (~11°)
-      avatarGroup.add(model);
+      const box = new THREE.Box3().setFromObject(model);
+      const sz = box.getSize(new THREE.Vector3());
+      const ct = box.getCenter(new THREE.Vector3());
+      model.position.x -= ct.x;
+      model.position.z -= ct.z;
+      model.position.y -= box.min.y;
+      if(sz.y>0) model.scale.setScalar(2.2/sz.y);
+      scene.add(model);
 
-      if (gltf.animations.length) {
+      if(gltf.animations?.length){
         mixer = new THREE.AnimationMixer(model);
-        const idleClip = gltf.animations.find(a => /idle/i.test(a.name)) || gltf.animations[0];
-        const talkClip = gltf.animations.find(a => /talk|speak/i.test(a.name));
-
-        idleAction = mixer.clipAction(idleClip);
-        idleAction.play();
-        if (talkClip) talkAction = mixer.clipAction(talkClip);
+        gltf.animations.forEach(clip=>{
+          const a = mixer.clipAction(clip);
+          a.setLoop(THREE.LoopRepeat, Infinity);
+          animActions[clip.name]=a;
+        });
+        play(['idle','Idle','breathing','Breathing','stand','Stand','mixamo.com'], true);
       }
 
-      // Caută morph target pentru maxilar pe toate mesh-urile din model
-      const JAW_NAMES = ['jawOpen','mouthOpen','Mouth_Open','jaw_open','JawOpen','mouthClose'];
-      model.traverse((child) => {
-        if (jawMesh) return;  // deja găsit
-        if (child.isMesh && child.morphTargetDictionary) {
-          for (const name of JAW_NAMES) {
-            if (child.morphTargetDictionary[name] !== undefined) {
-              jawMesh  = child;
-              jawIndex = child.morphTargetDictionary[name];
-              console.log(`[lip-sync] morph target "${name}" găsit pe "${child.name}" (idx=${jawIndex})`);
-              break;
+      model.traverse(nd=>{
+        if(nd.isMesh && nd.morphTargetDictionary){
+          for(const k of ['jawOpen','JawOpen','jaw_open','mouthOpen','MouthOpen',
+                          'mouth_open','viseme_aa','viseme_open','A','a']){
+            if(k in nd.morphTargetDictionary){
+              mouthMorphIdx=nd.morphTargetDictionary[k]; mouthMesh=nd; break;
             }
-          }
-          if (!jawMesh) {
-            // Afișează ce morph targets există (ajutor pentru debugging)
-            console.log(`[lip-sync] morph targets pe "${child.name}":`, Object.keys(child.morphTargetDictionary));
           }
         }
       });
-      if (!jawMesh) console.log('[lip-sync] fără morph targets — folosesc fallback animație');
+      console.log('[lip-sync] loaded | anims:'+Object.keys(animActions).length+' | mouth:'+(mouthMesh?.name||'none'));
+    }, null, err=>{ console.error('[avatar] error:',err); showFb(); });
 
-    }, undefined, (e) => console.error("GLB Error:", e));
+    let fr=0;
+    (function loop(){
+      requestAnimationFrame(loop);
+      const dt=clock.getDelta();
+      if(mixer) mixer.update(dt);
+      if(++fr%2===0) applyMouth(pendingMouth);
+      renderer.render(scene,camera);
+    })();
 
-    // Apelat din Python la ~30fps cu volumul RMS normalizat [0..1]
-    window.setMouthOpening = function(value) {
-      _mouthTarget = value;
-    };
-
-    window.setTalking = (v) => {
-      isTalking = !!v;
-      if (!mixer || !talkAction) return;
-      if (isTalking) {
-        idleAction.fadeOut(0.2);
-        talkAction.reset().fadeIn(0.2).play();
-      } else {
-        talkAction.fadeOut(0.2);
-        idleAction.reset().fadeIn(0.2).play();
-        _mouthTarget  = 0.0;  // forțăm gura închisă la oprire
-      }
-    };
-
-    function animate() {
-      requestAnimationFrame(animate);
-      const dt = clock.getDelta();
-      if (mixer) mixer.update(dt);
-
-      // Lip-sync: lerp fluid spre target (evită tremuratul maxilarului)
-      const lerpSpeed = 14.0;
-      _mouthCurrent += (_mouthTarget - _mouthCurrent) * Math.min(1.0, lerpSpeed * dt);
-
-      if (jawMesh && jawIndex >= 0) {
-        // Morph target disponibil → control precis al maxilarului
-        jawMesh.morphTargetInfluences[jawIndex] = _mouthCurrent;
-      } else if (mixer && talkAction && isTalking) {
-        // Fallback: modulăm weight-ul animației de vorbit după volum
-        // (min 0.3 ca să nu dispară animația complet, max 1.0)
-        talkAction.weight = 0.3 + _mouthCurrent * 0.7;
-      }
-
-      renderer.render(scene, camera);
+    function applyMouth(v){
+      if(!mouthMesh) return;
+      v=Math.max(0,Math.min(1,v));
+      if(mouthMorphIdx>=0 && mouthMesh.morphTargetInfluences)
+        mouthMesh.morphTargetInfluences[mouthMorphIdx]=v;
+      else if(mouthMesh.isBone)
+        mouthMesh.rotation.x=v*0.22;
     }
-    animate();
 
-    window.addEventListener("resize", () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    });
+    function showFb(){ canvas.style.display='none'; document.getElementById('fb').style.display='flex'; }
+
+    function play(names, force){
+      for(const n of names){
+        if(animActions[n]){
+          if(!force && animActions[n]===currentAction) return;
+          currentAction?.fadeOut(0.35);
+          animActions[n].reset().fadeIn(0.35).play();
+          currentAction=animActions[n]; return;
+        }
+      }
+      const first=Object.values(animActions)[0];
+      if(first && first!==currentAction){ currentAction?.fadeOut(0.3); first.reset().fadeIn(0.3).play(); currentAction=first; }
+    }
+
+    window.addEventListener('resize', resize);
+    function resize(){
+      const w=window.innerWidth, h=window.innerHeight;
+      renderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix();
+    }
+
+    window.setTalking=function(v){
+      if(v) play(['talking','Talk','Talking','speaking','gesture','Gesture']);
+      else  play(['idle','Idle','breathing','Breathing','stand','Stand','mixamo.com']);
+    };
+    window.setMouthOpening=function(v){ pendingMouth=parseFloat(v)||0; };
+    window.setEmotion=function(emotion){
+      const map={
+        idle:['idle','Idle','breathing','Breathing','stand','Stand','mixamo.com'],
+        happy:['happy','Happy','cheer','Cheer'],
+        excited:['excited','Excited','jump','Jump','cheer'],
+        talking:['talking','Talk','speaking','gesture'],
+        thinking:['thinking','Thinking','idle'],
+        sad:['sad','Sad','idle'],
+        encouraging:['wave','Wave','nod','idle'],
+      };
+      const snap=currentAction;
+      play(map[emotion]||map.idle);
+      if(emotion!=='idle'&&emotion!=='talking')
+        setTimeout(()=>{ if(currentAction===snap||!snap) window.setEmotion('idle'); },3000);
+    };
   </script>
 </body>
 </html>
