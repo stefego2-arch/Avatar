@@ -6,14 +6,26 @@ AvatarPanel — panoul din stânga cu avatarul 3D, status atenție și mesaje.
 from __future__ import annotations
 
 import numpy as np
+import os
 
-from PyQt6.QtCore import Qt, QUrl
+from PyQt6.QtCore import Qt, QUrl, QTimer
 from PyQt6.QtGui import QFont, QImage, QPixmap
 from PyQt6.QtWidgets import (
     QGroupBox, QLabel, QProgressBar, QPushButton, QVBoxLayout, QWidget,
 )
 
-from attention_monitor import AttentionState
+# Asigură-te că attention_monitor.py există și are clasa AttentionState
+# Dacă nu, poți comenta importul și folosi string-uri simple.
+try:
+    from attention_monitor import AttentionState
+except ImportError:
+    # Fallback simplu dacă lipsește fișierul
+    class AttentionState:
+        FOCUSED = 1
+        DISTRACTED = 2
+        TIRED = 3
+        AWAY = 4
+        UNKNOWN = 0
 
 
 class AvatarPanel(QWidget):
@@ -45,8 +57,12 @@ class AvatarPanel(QWidget):
         self.avatar_view = QWebEngineView()
         self.avatar_view.setPage(_DebugPage(self.avatar_view))
         self.avatar_view.setFixedHeight(320)
+
+        # AICI este cheia: folosim schema avatar:// configurată în main.py
         self.avatar_view.setUrl(QUrl("avatar://localhost/viewer.html"))
-        self.avatar_view.page().setBackgroundColor(Qt.GlobalColor.black)
+
+        # Facem fundalul transparent pentru a se integra în UI
+        self.avatar_view.page().setBackgroundColor(Qt.GlobalColor.transparent)
         self.avatar_view.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
         layout.addWidget(self.avatar_view)
 
@@ -79,7 +95,7 @@ class AvatarPanel(QWidget):
 
         # ── Preview cameră (toggle) ─────────────────────────────────────
         self._camera_preview = QLabel()
-        self._camera_preview.setFixedSize(200, 112)   # 16:9 miniatura
+        self._camera_preview.setFixedSize(200, 112)  # 16:9 miniatura
         self._camera_preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._camera_preview.setStyleSheet(
             "background-color: #1a1a2e; border-radius: 6px; color: #555;"
@@ -140,14 +156,15 @@ class AvatarPanel(QWidget):
         layout.addStretch()
         self.setLayout(layout)
 
-    def set_attention(self, state: AttentionState, pct: float):
+    def set_attention(self, state, pct: float):
         """Actualizează indicatorul de atenție."""
+        # Verificăm state-ul
         labels = {
-            AttentionState.FOCUSED:    ("🟢 ATENT", "#27ae60"),
+            AttentionState.FOCUSED: ("🟢 ATENT", "#27ae60"),
             AttentionState.DISTRACTED: ("🟠 DISTRAS", "#f39c12"),
-            AttentionState.TIRED:      ("🔵 OBOSIT", "#3498db"),
-            AttentionState.AWAY:       ("🔴 ABSENT", "#e74c3c"),
-            AttentionState.UNKNOWN:    ("⚪ ...", "#95a5a6"),
+            AttentionState.TIRED: ("🔵 OBOSIT", "#3498db"),
+            AttentionState.AWAY: ("🔴 ABSENT", "#e74c3c"),
+            AttentionState.UNKNOWN: ("⚪ ...", "#95a5a6"),
         }
         text, color = labels.get(state, ("⚪ ...", "#95a5a6"))
         self._lbl_attention.setText(text)
@@ -185,7 +202,7 @@ class AvatarPanel(QWidget):
             return
         try:
             h, w, ch = frame_bgr.shape
-            rgb = frame_bgr[:, :, ::-1].copy()   # BGR → RGB
+            rgb = frame_bgr[:, :, ::-1].copy()  # BGR → RGB
             qi = QImage(rgb.data, w, h, ch * w, QImage.Format.Format_RGB888)
             px = QPixmap.fromImage(qi).scaled(
                 200, 112,
@@ -198,6 +215,7 @@ class AvatarPanel(QWidget):
 
     def set_emotion(self, emotion: str):
         """Controlează animația avatarului 3D prin JS (setTalking)."""
+        # Folosim logica din codul tău vechi care părea să fie pe 'setTalking'
         is_talking = emotion in ("talking", "happy", "correct")
         js = f"if(window.setTalking) window.setTalking({'true' if is_talking else 'false'});"
         try:

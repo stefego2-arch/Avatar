@@ -12,8 +12,8 @@
   <script type="importmap">
   {
     "imports": {
-      "three": "./three/three.module.js",
-      "three/addons/": "./three/"
+      "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
     }
   }
   </script>
@@ -23,7 +23,7 @@
 
   <script type="module">
     import * as THREE from 'three';
-    import { GLTFLoader } from 'three/addons/GLTFLoader.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
     const canvas = document.getElementById("c");
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });

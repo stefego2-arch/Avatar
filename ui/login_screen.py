@@ -21,6 +21,7 @@ class LoginScreen(QWidget):
     """Ecran de selectare elev si materie."""
     login_done      = pyqtSignal(dict, str, int)  # user dict, subject, lesson_id
     dashboard_open  = pyqtSignal(int, str)         # user_id, user_name
+    quest_open      = pyqtSignal(int, str)         # user_id, user_name (Daily Quest)
 
     def __init__(self, db: Database):
         super().__init__()
@@ -140,6 +141,9 @@ class LoginScreen(QWidget):
         main_layout.addWidget(materie_box)
 
         # Buton dashboard progres
+        btns_row = QHBoxLayout()
+        btns_row.setSpacing(12)
+
         btn_progres = QPushButton("📊 Vezi Progresul")
         btn_progres.setFont(QFont("Arial", 13, QFont.Weight.Bold))
         btn_progres.setMinimumHeight(46)
@@ -149,7 +153,21 @@ class LoginScreen(QWidget):
             "QPushButton:hover { background-color: #7d3c98; }"
         )
         btn_progres.clicked.connect(self._open_dashboard)
-        main_layout.addWidget(btn_progres)
+        btns_row.addWidget(btn_progres)
+
+        btn_quest = QPushButton("🎯 Misiunea de Azi")
+        btn_quest.setFont(QFont("Arial", 13, QFont.Weight.Bold))
+        btn_quest.setMinimumHeight(46)
+        btn_quest.setStyleSheet(
+            "QPushButton { background: qlineargradient(x1:0,y1:0,x2:1,y2:0,"
+            "stop:0 #e74c3c,stop:1 #c0392b); color: white; "
+            "border-radius: 10px; padding: 8px 20px; } "
+            "QPushButton:hover { background-color: #c0392b; }"
+        )
+        btn_quest.clicked.connect(self._open_daily_quest)
+        btns_row.addWidget(btn_quest)
+
+        main_layout.addLayout(btns_row)
 
         # Status sistem
         self._status = QLabel("Sistem gata")
@@ -258,6 +276,15 @@ class LoginScreen(QWidget):
         user = self._user_combo.itemData(idx)
         if user:
             self.dashboard_open.emit(user["id"], user["name"])
+
+    def _open_daily_quest(self):
+        idx = self._user_combo.currentIndex()
+        if idx < 0:
+            QMessageBox.warning(self, "Eroare", "Selectează un elev!")
+            return
+        user = self._user_combo.itemData(idx)
+        if user:
+            self.quest_open.emit(user["id"], user["name"])
 
     def update_status(self, text: str, color: str = "#27ae60"):
         self._status.setText(text)

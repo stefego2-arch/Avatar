@@ -2,23 +2,59 @@ from __future__ import annotations
 
 import sqlite3
 import json
+import threading
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import Optional, Iterable
 
 
 class Database:
+    # ── Materii suportate (extensibil — adaugă orice materie fără cod suplimentar) ──
+    # Această constantă e INFORMATIVĂ. Orice materie poate fi inserată în DB.
+    KNOWN_SUBJECTS = [
+        "Matematică", "Limba Română", "Limba Engleză",
+        "Științe ale Naturii", "Istorie", "Geografie",
+        "Biologie", "Fizică", "Chimie", "Informatică",
+        "Educație Civică", "Religie", "Arte Vizuale", "Muzică",
+    ]
+
     def __init__(self, db_path: str = "production.db"):
         self.db_path = db_path
         self._conn = sqlite3.connect(db_path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL")
+
+        # ── Threading: lock pentru scrieri concurente ─────────────────────────
+        # Protejează față de _generate_exercises_background (thread daemon) care
+        # scrie în DB simultan cu thread-ul UI. WAL permite citiri concurente.
+        self._write_lock = threading.Lock()
+
         self._init_schema()
         self._seed_demo_data()
-        self._ensure_all_grades()           # mereu - adauga lectii pt clasele lipsa
-        self._ensure_default_skills()       # mereu - adauga skill codes cu INSERT OR IGNORE
-        self._ensure_lesson_numere_0_5()    # mereu - migrare lecție clasa I matematică 0–5
-        self._ensure_grade1_from_manual()   # mereu - populare 24 lecții clasa I CD PRESS
+        self._ensure_all_grades()
+        self._ensure_default_skills()
+        self._ensure_lesson_numere_0_5()
+        self._ensure_grade1_from_manual()
         print(f"Database: {db_path}")
+
+    @property
+    def write_lock(self) -> threading.Lock:
+        """Expune lock-ul de scriere pentru thread-uri externe (ex: lesson_engine)."""
+        return self._write_lock
+
+    @contextmanager
+    def _write(self):
+        """Context manager pentru scrieri thread-safe.
+
+        Folosire:
+            with self._write():
+                self._conn.execute(sql, params)
+                self._conn.commit()
+
+        NU este nevoie să-l folosești la operații de citire (SELECT).
+        """
+        with self._write_lock:
+            yield
 
 
     # ───────────────────────────────────────────────────────────────────
@@ -221,7 +257,24 @@ class Database:
             return "Limba Română"
         if s2 in ("engleza", "limba engleza", "lb engleza", "english"):
             return "Limba Engleză"
-        # fallback: încearcă să păstrezi cum a venit
+        if s2 in ("stiinte", "stiinte ale naturii", "stiinte naturii"):
+            return "Științe ale Naturii"
+        if s2 in ("istorie", "history"):
+            return "Istorie"
+        if s2 in ("geografie", "geo", "geography"):
+            return "Geografie"
+        if s2 in ("biologie", "bio", "biology"):
+            return "Biologie"
+        if s2 in ("fizica", "fizica", "physics"):
+            return "Fizică"
+        if s2 in ("chimie", "chim", "chemistry"):
+            return "Chimie"
+        if s2 in ("informatica", "info", "cs", "computer science"):
+            return "Informatică"
+        if s2 in ("educatie civica", "ed civica", "civica"):
+            return "Educație Civică"
+        # ── Fallback: orice materie nouă e acceptată exact cum vine ──────────
+        # Nu bloca niciodată o materie necunoscută — sistemul e extensibil.
         return subject
 
     def get_next_lesson(self, user_id: int, grade: int, subject: str):
@@ -1449,14 +1502,15 @@ class Database:
         interval = 1 if wrong_count <= 1 else (3 if wrong_count == 2 else 7)
         retry_after = (date.today() + timedelta(days=interval)).isoformat()
 
-        self._conn.execute(
-            """INSERT INTO user_exercise_stats (user_id, exercise_id, wrong_count, retry_after)
-               VALUES (?, ?, ?, ?)
-               ON CONFLICT(user_id, exercise_id)
-               DO UPDATE SET wrong_count=excluded.wrong_count, retry_after=excluded.retry_after""",
-            (int(user_id), int(exercise_id), wrong_count, retry_after),
-        )
-        self._conn.commit()
+        with self._write():
+            self._conn.execute(
+                """INSERT INTO user_exercise_stats (user_id, exercise_id, wrong_count, retry_after)
+                   VALUES (?, ?, ?, ?)
+                   ON CONFLICT(user_id, exercise_id)
+                   DO UPDATE SET wrong_count=excluded.wrong_count, retry_after=excluded.retry_after""",
+                (int(user_id), int(exercise_id), wrong_count, retry_after),
+            )
+            self._conn.commit()
 
     def get_due_exercises(self, user_id: int, lesson_id: int) -> list[dict]:
         """
@@ -1516,62 +1570,67 @@ class Database:
     # ───────────────────────────────────────────────────────────────────
 
     def start_session(self, user_id: int, lesson_id: int, phase: str = "practice") -> int:
-        cur = self._conn.execute(
-            "INSERT INTO sessions (user_id, lesson_id, phase, started_at) VALUES (?,?,?,datetime('now'))",
-            (int(user_id), int(lesson_id), phase),
-        )
-        self._conn.commit()
-        return int(cur.lastrowid)
+        with self._write():
+            cur = self._conn.execute(
+                "INSERT INTO sessions (user_id, lesson_id, phase, started_at) VALUES (?,?,?,datetime('now'))",
+                (int(user_id), int(lesson_id), phase),
+            )
+            self._conn.commit()
+            return int(cur.lastrowid)
 
     def record_answer(self, session_id: int, exercise_id: int, user_answer: str,
                       is_correct: bool, hints_used: int = 0, time_sec: float = 0.0):
-        self._conn.execute(
-            """INSERT INTO session_answers (session_id, exercise_id, user_answer, is_correct, hints_used, time_sec)
-               VALUES (?,?,?,?,?,?)""",
-            (int(session_id), int(exercise_id), user_answer, 1 if is_correct else 0, int(hints_used), float(time_sec)),
-        )
-        self._conn.commit()
+        with self._write():
+            self._conn.execute(
+                """INSERT INTO session_answers (session_id, exercise_id, user_answer, is_correct, hints_used, time_sec)
+                   VALUES (?,?,?,?,?,?)""",
+                (int(session_id), int(exercise_id), user_answer, 1 if is_correct else 0, int(hints_used), float(time_sec)),
+            )
+            self._conn.commit()
 
     def end_session(self, session_id: int, score: float, total_q: int, correct_q: int, duration_s: int, attention_pct: float = 100.0):
-        self._conn.execute(
-            """UPDATE sessions SET score=?, total_q=?, correct_q=?, duration_s=?, ended_at=datetime('now'), attention_pct=?
-               WHERE id=?""",
-            (float(score), int(total_q), int(correct_q), int(duration_s), float(attention_pct), int(session_id)),
-        )
-        self._conn.commit()
+        with self._write():
+            self._conn.execute(
+                """UPDATE sessions SET score=?, total_q=?, correct_q=?, duration_s=?, ended_at=datetime('now'), attention_pct=?
+                   WHERE id=?""",
+                (float(score), int(total_q), int(correct_q), int(duration_s), float(attention_pct), int(session_id)),
+            )
+            self._conn.commit()
 
     # ───────────────────────────────────────────────────────────────────
     # Progress
     # ───────────────────────────────────────────────────────────────────
 
     def update_progress(self, user_id: int, lesson_id: int, score: float, passed: bool):
+        # Citire fără lock (WAL permite citiri concurente)
         row = self._conn.execute(
             "SELECT * FROM progress WHERE user_id=? AND lesson_id=?",
             (int(user_id), int(lesson_id)),
         ).fetchone()
 
         now = datetime.now().isoformat(timespec="seconds")
-        if not row:
-            self._conn.execute(
-                """INSERT INTO progress (user_id, lesson_id, best_score, attempts, passed, current_level, consecutive_good, last_attempt)
-                   VALUES (?,?,?,?,?,?,?,?)""",
-                (int(user_id), int(lesson_id), float(score), 1, 1 if passed else 0, 1, 1 if passed else 0, now),
-            )
-        else:
-            best = max(float(row["best_score"] or 0), float(score))
-            attempts = int(row["attempts"] or 0) + 1
-            consecutive_good = int(row["consecutive_good"] or 0)
-            if passed:
-                consecutive_good += 1
+        with self._write():
+            if not row:
+                self._conn.execute(
+                    """INSERT INTO progress (user_id, lesson_id, best_score, attempts, passed, current_level, consecutive_good, last_attempt)
+                       VALUES (?,?,?,?,?,?,?,?)""",
+                    (int(user_id), int(lesson_id), float(score), 1, 1 if passed else 0, 1, 1 if passed else 0, now),
+                )
             else:
-                consecutive_good = 0
-            self._conn.execute(
-                """UPDATE progress
-                   SET best_score=?, attempts=?, passed=?, consecutive_good=?, last_attempt=?
-                   WHERE user_id=? AND lesson_id=?""",
-                (best, attempts, 1 if passed else int(row["passed"] or 0), consecutive_good, now, int(user_id), int(lesson_id)),
-            )
-        self._conn.commit()
+                best = max(float(row["best_score"] or 0), float(score))
+                attempts = int(row["attempts"] or 0) + 1
+                consecutive_good = int(row["consecutive_good"] or 0)
+                if passed:
+                    consecutive_good += 1
+                else:
+                    consecutive_good = 0
+                self._conn.execute(
+                    """UPDATE progress
+                       SET best_score=?, attempts=?, passed=?, consecutive_good=?, last_attempt=?
+                       WHERE user_id=? AND lesson_id=?""",
+                    (best, attempts, 1 if passed else int(row["passed"] or 0), consecutive_good, now, int(user_id), int(lesson_id)),
+                )
+            self._conn.commit()
 
     def get_progress(self, user_id: int) -> list[dict]:
         rows = self._conn.execute(
@@ -1592,12 +1651,12 @@ class Database:
             row = self._conn.execute("SELECT 1 FROM skills WHERE code=?", (code,)).fetchone()
             if row:
                 continue
-            # create generic
-            self._conn.execute(
-                "INSERT OR IGNORE INTO skills (code, subject, grade, name, description, prereq_codes) VALUES (?,?,?,?,?,?)",
-                (code, "Generic", 1, code, "", json.dumps([])),
-            )
-        self._conn.commit()
+            with self._write():
+                self._conn.execute(
+                    "INSERT OR IGNORE INTO skills (code, subject, grade, name, description, prereq_codes) VALUES (?,?,?,?,?,?)",
+                    (code, "Generic", 1, code, "", json.dumps([])),
+                )
+                self._conn.commit()
 
     def update_user_skills(self, user_id: int, skill_codes: Iterable[str],
                            is_correct: bool, weight: float = 1.0,
@@ -1967,20 +2026,40 @@ class Database:
 
     # ── SRS (Spaced Repetition System) ───────────────────────────────────────
 
-    def get_srs_due(self, user_id: int, limit: int = 3) -> list[dict]:
-        """Returnează exerciții scadente pentru review (due_date <= azi)."""
+    def get_srs_due(self, user_id: int, limit: int = 3,
+                    subject: str = None) -> list[dict]:
+        """Returnează exerciții scadente pentru review (due_date <= azi).
+
+        subject: dacă specificat, filtrează doar exerciții din materia curentă
+                 (evită afișarea exercițiilor de Română în lecțiile de Matematică).
+        """
         today = datetime.now().strftime("%Y-%m-%d")
-        rows = self._conn.execute(
-            """SELECT e.id, e.enunt, e.raspuns, e.hint1, e.hint2, e.hint3,
-                      e.explicatie, e.dificultate, e.skill_codes, e.lesson_id,
-                      srs.repetitions, srs.ease_factor
-               FROM srs_queue srs
-               JOIN exercises e ON e.id = srs.exercise_id
-               WHERE srs.user_id = ? AND srs.due_date <= ?
-               ORDER BY srs.due_date ASC
-               LIMIT ?""",
-            (int(user_id), today, limit),
-        ).fetchall()
+        if subject:
+            rows = self._conn.execute(
+                """SELECT e.id, e.enunt, e.raspuns, e.hint1, e.hint2, e.hint3,
+                          e.explicatie, e.dificultate, e.skill_codes, e.lesson_id,
+                          srs.repetitions, srs.ease_factor
+                   FROM srs_queue srs
+                   JOIN exercises e ON e.id = srs.exercise_id
+                   JOIN lessons   l ON l.id = e.lesson_id
+                   WHERE srs.user_id = ? AND srs.due_date <= ?
+                     AND l.subject = ?
+                   ORDER BY srs.due_date ASC
+                   LIMIT ?""",
+                (int(user_id), today, subject, limit),
+            ).fetchall()
+        else:
+            rows = self._conn.execute(
+                """SELECT e.id, e.enunt, e.raspuns, e.hint1, e.hint2, e.hint3,
+                          e.explicatie, e.dificultate, e.skill_codes, e.lesson_id,
+                          srs.repetitions, srs.ease_factor
+                   FROM srs_queue srs
+                   JOIN exercises e ON e.id = srs.exercise_id
+                   WHERE srs.user_id = ? AND srs.due_date <= ?
+                   ORDER BY srs.due_date ASC
+                   LIMIT ?""",
+                (int(user_id), today, limit),
+            ).fetchall()
         return [dict(r) for r in rows]
 
     def record_srs_answer(self, user_id: int, exercise_id: int, quality: int):
@@ -2043,4 +2122,3 @@ class Database:
             self._conn.close()
         except Exception:
             pass
-

@@ -1,0 +1,39 @@
+# ══════════════════════════════════════════════════════════════
+#  Avatar Tutor — DEPENDENȚE OBLIGATORII
+#  Instalare: pip install -r requirements-core.txt
+#
+#  Acestea sunt suficiente ca aplicația să pornească și să
+#  funcționeze complet (fără voce și fără cameră).
+# ══════════════════════════════════════════════════════════════
+
+# ── GUI ──────────────────────────────────────────────────────
+PyQt6>=6.6.0
+PyQt6-WebEngine>=6.6.0
+
+# ── Date + Vizualizare ───────────────────────────────────────
+numpy>=1.26.0
+matplotlib>=3.8.0
+Pillow>=10.0.0
+
+# ── AI / LLM ─────────────────────────────────────────────────
+# DeepSeek rulează local prin Ollama — nu necesită API key.
+# Installare Ollama: https://ollama.com/download
+# Model: ollama pull deepseek-r1:8b
+requests>=2.31.0
+
+# ── Export / Rapoarte ────────────────────────────────────────
+openpyxl>=3.1.0
+
+# ── Procesare Markdown ───────────────────────────────────────
+markdown-it-py>=3.0
+
+# ── Configurare ──────────────────────────────────────────────
+python-dotenv>=1.0.0
+
+# ══════════════════════════════════════════════════════════════
+#  NOTĂ TTS OFFLINE (Piper):
+#  Piper nu se instalează prin pip. Descarcă executabilul +
+#  modelul românesc manual:
+#    https://github.com/rhasspy/piper/releases
+#  Model: ro_RO-mihai-medium.onnx  (plasat în piper_voices/)
+# ══════════════════════════════════════════════════════════════

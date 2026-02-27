@@ -115,6 +115,7 @@ from md_lesson_player import MDLessonPlayer
 from md_library import ManualLibrary, load_md_chunks
 from voice_input import MicButton, CommandListener
 from dashboard import DashboardScreen
+from daily_quest import DailyQuestScreen
 from stars_widget import StarAwardDialog, StarsBadge
 
 # ── Componente UI din pachetul ui/ ───────────────────────────────────────────
@@ -252,10 +253,19 @@ class MainWindow(QMainWindow):
         self._dashboard.back_requested.connect(self._show_login)
         self._stack.addWidget(self._dashboard)   # index 2
 
+        # Ecran Daily Quest — Misiunea de Azi
+        self._daily_quest = DailyQuestScreen(self.db)
+        self._daily_quest.back_requested.connect(self._show_login)
+        self._daily_quest.quest_start_requested.connect(self._on_quest_start)
+        self._stack.addWidget(self._daily_quest)  # index 3
+
         self._connect_engine_callbacks()
 
         # Conectam semnalul de deschidere dashboard din login
         self._login_screen.dashboard_open.connect(self._on_dashboard_open)
+        # Conectează butonul Daily Quest din LoginScreen (dacă există)
+        if hasattr(self._login_screen, "quest_open"):
+            self._login_screen.quest_open.connect(self._on_quest_btn_login)
 
         # ── Conectare semnale UI → Engine ─────────────────────────────────
         self._lesson_panel.answer_submitted.connect(
@@ -316,14 +326,18 @@ class MainWindow(QMainWindow):
 
     def _connect_engine_callbacks(self):
         """Leagă callbacks-urile engine-ului la UI."""
-        self.engine.on_state_change = self._on_state_change
-        self.engine.on_show_text = self._on_show_text
-        self.engine.on_show_exercise = self._on_show_exercise
-        self.engine.on_show_hint = self._on_show_hint
+        self.engine.on_state_change    = self._on_state_change
+        self.engine.on_show_text       = self._on_show_text
+        self.engine.on_show_exercise   = self._on_show_exercise
+        self.engine.on_show_hint       = self._on_show_hint
         self.engine.on_exercise_result = self._on_exercise_result
-        self.engine.on_phase_complete = self._on_phase_complete
-        self.engine.on_avatar_message = self._on_avatar_message
-        self.engine.on_done = self._on_lesson_done
+        self.engine.on_phase_complete  = self._on_phase_complete
+        self.engine.on_avatar_message  = self._on_avatar_message
+        self.engine.on_done            = self._on_lesson_done
+        # ── Avatar reacționează la starea reală a lecției ─────────────────────
+        self.engine.on_emotion_change  = self._on_emotion_change
+        # ── Gamification: StarAwardDialog la streak 3, 5, 10 ─────────────────
+        self.engine.on_streak_milestone = self._on_streak_milestone
         lesson_panel = getattr(self, "_lesson_panel", None)
         if lesson_panel:
             self.engine.on_show_scratchpad = lesson_panel.activate_scratchpad
@@ -419,6 +433,53 @@ class MainWindow(QMainWindow):
 
     def _on_avatar_message(self, text: str, emotion: str):
         QTimer.singleShot(0, lambda: self._avatar_panel.set_message(text, emotion))
+
+    def _on_emotion_change(self, emotion: str, intensity: float):
+        """Avatar reacționează la starea reală a lecției.
+
+        Apelat de engine la: răspuns corect/greșit, tier change, streak milestone,
+        start/end faze. intensity 0.0-1.0 — poate fi folosit pentru amplitudine
+        animație (ex. avatarul sare mai sus la intensity=1.0).
+        """
+        # Thread-safe: engine rulează în thread principal, dar dacă vine din bg thread
+        QTimer.singleShot(0, lambda: self._avatar_panel.set_emotion(emotion))
+
+    def _on_streak_milestone(self, streak: int):
+        """Afișează StarAwardDialog la streak 3, 5, 10 — fără a întrerupe lecția.
+
+        Dialogul apare NON-BLOCANT (QTimer 300ms delay) ca să nu tăie animația
+        de feedback a exercițiului.
+        """
+        def _show():
+            if not (self.engine and self.engine.session):
+                return
+            session = self.engine.session
+            lesson_title = session.lesson.get("title", "")
+            user_id = self._current_user.get("id", 0) if self._current_user else 0
+
+            # Stele curente din DB (nu re-acordăm — dialogul e motivațional, nu recompensă)
+            stars_row = self.db.get_user_stars(user_id) if user_id else {}
+            total_stars = stars_row.get("total_stars", 0)
+
+            milestone_msgs = {
+                3:  f"🔥 Streak {streak}! Trei răspunsuri corecte la rând!",
+                5:  f"⚡ Streak {streak}! Ești în formă maximă!",
+                10: f"🌟 Streak {streak}! Legendar! Continui să uimești!",
+            }
+            msg = milestone_msgs.get(streak, f"🎯 Streak {streak}!")
+
+            dlg = StarAwardDialog(
+                stars=min(3, streak // 3),  # afișăm 1-3 stele în funcție de streak
+                streak=streak,
+                lesson_title=msg,
+                score_pct=float(streak * 10),   # progres vizual
+                parent=self,
+            )
+            # Non-blocant: show() nu exec() — lecția continuă în spate
+            dlg.show()
+            QTimer.singleShot(3000, dlg.accept)  # se închide automat după 3s
+
+        QTimer.singleShot(300, _show)
 
     def _on_lesson_done(self, session):
         """Sesiunea de lectie s-a terminat."""
@@ -580,6 +641,25 @@ class MainWindow(QMainWindow):
         self._dashboard.load_user(user_id, user_name)
         self._stack.setCurrentIndex(2)
 
+    def show_daily_quest(self, user: dict):
+        """Afișează ecranul Misiunea de Azi pentru utilizatorul dat."""
+        self._daily_quest.load_for_user(user)
+        self._stack.setCurrentIndex(3)
+
+    def _on_quest_start(self, user_id: int, lesson_id: int):
+        """Pornește lecția selectată de Daily Quest."""
+        # Găsim user-ul din login combo
+        login = self._login_screen
+        for i in range(login._user_combo.count()):
+            u = login._user_combo.itemData(i)
+            if u and u.get("id") == user_id:
+                lesson = self.db.get_lesson(lesson_id)
+                if lesson:
+                    self.db.update_user_active(user_id)
+                    subject = lesson.get("subject", "Matematică")
+                    self._on_login(u, subject, lesson_id)
+                return
+
     def _toggle_pause(self):
         """Pauza/resume lecție."""
         if not self.engine.session:
@@ -609,6 +689,13 @@ class MainWindow(QMainWindow):
         """Actualizează UI-ul de atenție (din thread camera)."""
         pct = self.attention.get_attention_percent()
         QTimer.singleShot(0, lambda: self._avatar_panel.set_attention(state, pct))
+
+    def _on_quest_btn_login(self, user_id: int, user_name: str):
+        """Handler pentru butonul Daily Quest din ecranul de login."""
+        idx = self._login_screen._user_combo.currentIndex()
+        user = self._login_screen._user_combo.itemData(idx)
+        if user:
+            self.show_daily_quest(user)
 
     def _on_attention_intervention(self, message: str):
         """Avatar intervine când elevul e distras (din thread camera)."""

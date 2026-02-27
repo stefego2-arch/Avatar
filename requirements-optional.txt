@@ -1,0 +1,50 @@
+# ══════════════════════════════════════════════════════════════
+#  Avatar Tutor — DEPENDENȚE OPȚIONALE
+#  Instalare: pip install -r requirements-optional.txt
+#
+#  ⚠️  ATENȚIE — ORDINE OBLIGATORIE:
+#  Instalează MAI ÎNTÂI requirements-core.txt, APOI acesta.
+#
+#  Fiecare grup poate fi instalat separat — aplicația
+#  funcționează fără oricare grup (cu fallback graceful).
+# ══════════════════════════════════════════════════════════════
+
+# ── [GRUP 1] Input voce (Whisper) ────────────────────────────
+# ⚠️  CONFLICT CUNOSCUT pe Windows:
+#   ctranslate2 (folosit de faster-whisper) + Qt WebEngine
+#   (Chromium ProcessDynamicCodePolicy) = crash la pornire.
+#
+#   FIX aplicat în main.py:
+#     os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] =
+#         "--disable-features=RendererCodeIntegrity"
+#   Dacă tot dă crash, dezactivează vocea în voice_input.py:
+#     WHISPER_DISABLED = True
+#
+# pip install faster-whisper>=1.0.0 sounddevice>=0.4.6 scipy>=1.11.0
+faster-whisper>=1.0.0
+sounddevice>=0.4.6
+scipy>=1.11.0
+
+# ── [GRUP 2] Monitorizare atenție (cameră + MediaPipe) ───────
+# Necesită cameră web. Dacă lipsește, attention_monitor.py
+# funcționează în mod "stub" (fără monitorizare).
+#
+# pip install opencv-python>=4.9.0 mediapipe>=0.10.0
+opencv-python>=4.9.0
+mediapipe>=0.10.0
+
+# ── [GRUP 3] TTS cloud ElevenLabs ────────────────────────────
+# Alternativă premium la Piper (necesită API key în .env).
+# Fallback automat pe Piper dacă lipsește cheia.
+# ELEVENLABS_API_KEY=... în fișierul .env
+#
+# pip install elevenlabs>=1.0.0 aiohttp>=3.9.0
+elevenlabs>=1.0.0
+aiohttp>=3.9.0
+
+# ══════════════════════════════════════════════════════════════
+#  NOTĂ GENERALĂ:
+#  Dacă vreun pachet opțional eșuează la instalare, aplica-
+#  ția pornește oricum — fiecare modul are try/except + fallback.
+#  Verifică statusul la pornire: "TTS: ... | DeepSeek: ... | Camera: ..."
+# ══════════════════════════════════════════════════════════════

@@ -201,6 +201,16 @@ class LessonEngine:
         self.on_phase_complete:  Optional[Callable[[str, float], None]] = None
         self.on_done:            Optional[Callable[[LessonSession], None]] = None
         self.on_avatar_message:  Optional[Callable[[str, str], None]] = None  # text, emotion
+        self.on_emotion_change:  Optional[Callable[[str, float], None]] = None  # emotion, intensity
+        self.on_streak_milestone: Optional[Callable[[int], None]] = None  # streak count
+
+    def _emit_emotion(self, emotion: str, intensity: float = 0.7):
+        """Emite o emoție către avatar (happy/sad/excited/thinking) cu intensitate 0–1."""
+        if self.on_emotion_change:
+            try:
+                self.on_emotion_change(emotion, intensity)
+            except Exception:
+                pass
 
     # ───────────────────────────────────────────────────────────────────
     # Public control
@@ -226,7 +236,8 @@ class LessonEngine:
         self.session.session_id = self.db.start_session(user_id, lesson_id, "full")
 
         # SRS Jocul de Încălzire — exerciții scadente din sesiuni anterioare
-        srs_due = self.db.get_srs_due(user_id, limit=3)
+        srs_due = self.db.get_srs_due(user_id, limit=3,
+                                      subject=lesson.get("subject"))
         if srs_due:
             self.session.warmup_exercises = srs_due
             self.session.srs_exercise_ids = {ex["id"] for ex in srs_due}
@@ -552,6 +563,18 @@ class LessonEngine:
             self.session.tier_up_streak += 1
             self.session.tier_down_count = 0
             feedback = get_message("encourage")
+            # ── Emoție bazată pe streak ─────────────────────────────────
+            streak = self.session.correct_streak
+            if streak >= 10:
+                self._emit_emotion("excited", 1.0)
+                if self.on_streak_milestone:
+                    self.on_streak_milestone(streak)
+            elif streak >= 5:
+                self._emit_emotion("excited", 0.85)
+                if self.on_streak_milestone:
+                    self.on_streak_milestone(streak)
+            else:
+                self._emit_emotion("happy", min(0.6 + streak * 0.05, 0.9))
         else:
             self.session.correct_streak = 0
             self.session.consecutive_wrong += 1
@@ -559,6 +582,14 @@ class LessonEngine:
             self.session.tier_down_count += 1
             fb = self._mis.feedback(self.session.lesson.get("subject", ""), ex.get("enunt", ""), correct, user)
             feedback = fb or ex.get("explicatie") or get_message("try_again")
+            # ── Emoție bazată pe greșeli consecutive ────────────────────
+            wrong = self.session.consecutive_wrong
+            if wrong >= 3:
+                self._emit_emotion("thinking", 0.6)
+            elif wrong >= 2:
+                self._emit_emotion("sad", 0.6)
+            else:
+                self._emit_emotion("sad", 0.4)
 
         # DDA: tier upgrade la 3 răspunsuri corecte consecutive
         if self.session.tier_up_streak >= 3 and self.session.current_tier < 3:
